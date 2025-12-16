@@ -40,3 +40,18 @@ body,
   /* Optional: gives a border to see the boundaries */
   /* border: 1px solid #00ff88; */
 }
+
+.canvas-attack {
+  /* You can use a URL to a small .png icon for a real target cursor */
+  cursor: crosshair !important;
+}
+
+.canvas-move {
+  cursor: url("https://findicons.com/files/icons/1620/crystal_project/16/cursor_arrow.png"),
+    auto;
+}
+
+canvas {
+  /* This hides the default mouse so we can draw our own */
+  cursor: none !important;
+}

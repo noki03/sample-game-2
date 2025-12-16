@@ -10,6 +10,7 @@ export const UNIT_STATS = {
 export const INITIAL_STATE = {
     gameId: 'match_001',
     tick: 0,
+    status: 'PLAYING',
 
     // Note: 'self' should be replaced by a real player ID from the server later
     players: [

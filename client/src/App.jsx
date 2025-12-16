@@ -3,6 +3,7 @@
 import { useGameStore } from './store/useGameStore';
 import CommandPanel from './ui/CommandPanel';
 import GameCanvas from './ui/GameCanvas';
+import VictoryScreen from './ui/VictoryScreen';
 
 function App() {
   const gameState = useGameStore((state) => state.gameState);
@@ -12,7 +13,7 @@ function App() {
 
       <GameCanvas />
       <CommandPanel />
-
+      <VictoryScreen />
       {/* TEMP UI Elements positioned over the canvas */}
 
       {/* <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.5)', padding: '10px' }}>

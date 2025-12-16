@@ -5,7 +5,6 @@ const processCommands = (state, commands) => {
     commands.forEach(command => {
         const { type, payload, playerId } = command;
 
-        // --- Handle Movement & Attack Orders ---
         if (type === 'MOVE_UNITS') {
             payload.unitIds.forEach(unitId => {
                 const unit = state.units.find(u => u.id === unitId);
@@ -25,23 +24,18 @@ const processCommands = (state, commands) => {
             });
         }
 
-        // --- Handle Production Orders ---
         if (type === 'BUILD_UNIT') {
             const player = state.players.find(p => p.id === playerId);
             const building = state.buildings.find(b => b.id === payload.buildingId);
             const stats = UNIT_STATS[payload.unitType];
 
             if (player && building && player.resources.money >= stats.cost) {
-                // Deduct cost immediately on command processing
                 player.resources.money -= stats.cost;
-
-                // Add to the building's production queue
                 building.queue.push({
                     type: payload.unitType,
                     progress: 0,
                     totalTime: stats.buildTime
                 });
-                console.log(`Queued ${payload.unitType} at building ${building.id}`);
             }
         }
     });
@@ -74,41 +68,40 @@ const updateUnitMovement = (state) => {
     });
 };
 
-
 const resolveUnitCollisions = (state) => {
     const units = state.units;
-    const radius = 12; // Slightly larger than the unit drawing size (10)
-    const pushStrength = 0.5; // How strongly they push each other away
+    const radius = 10; // Collision radius (matches drawing size)
+    const minDistance = radius * 2;
+    const iterations = 2; // Running twice makes the "jiggle" more stable
 
-    for (let i = 0; i < units.length; i++) {
-        for (let j = i + 1; j < units.length; j++) {
-            const u1 = units[i];
-            const u2 = units[j];
+    for (let step = 0; step < iterations; step++) {
+        for (let i = 0; i < units.length; i++) {
+            for (let j = i + 1; j < units.length; j++) {
+                const u1 = units[i];
+                const u2 = units[j];
 
-            const dx = u2.x - u1.x;
-            const dy = u2.y - u1.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const minDistance = radius * 2;
+                const dx = u2.x - u1.x;
+                const dy = u2.y - u1.y;
+                const distanceSq = dx * dx + dy * dy;
 
-            if (distance < minDistance && distance > 0) {
-                // Calculate overlap
-                const overlap = minDistance - distance;
-                const nx = dx / distance; // Normal X
-                const ny = dy / distance; // Normal Y
+                if (distanceSq < minDistance * minDistance && distanceSq > 0) {
+                    const distance = Math.sqrt(distanceSq);
+                    const overlap = (minDistance - distance) / 2;
 
-                // Push them apart
-                const moveX = nx * overlap * pushStrength;
-                const moveY = ny * overlap * pushStrength;
+                    // Normal vector
+                    const nx = dx / distance;
+                    const ny = dy / distance;
 
-                u1.x -= moveX;
-                u1.y -= moveY;
-                u2.x += moveX;
-                u2.y += moveY;
+                    // Push each unit back by half the overlap
+                    u1.x -= nx * overlap;
+                    u1.y -= ny * overlap;
+                    u2.x += nx * overlap;
+                    u2.y += ny * overlap;
+                }
             }
         }
     }
 };
-// client/src/game/GameLogic.js
 
 const updateProduction = (state) => {
     state.buildings.forEach(b => {
@@ -118,10 +111,9 @@ const updateProduction = (state) => {
 
             if (currentItem.progress >= currentItem.totalTime) {
                 const stats = UNIT_STATS[currentItem.type];
-
-                const newUnit = {
-                    id: Date.now() + Math.random(),
-                    ownerId: b.ownerId, // This ensures the unit matches the building (which is now your Socket ID)
+                state.units.push({
+                    id: Math.random(), // Unique per spawn
+                    ownerId: b.ownerId,
                     type: currentItem.type,
                     x: b.x + 60,
                     y: b.y + 60,
@@ -132,11 +124,8 @@ const updateProduction = (state) => {
                     isMoving: true,
                     status: 'MOVING',
                     stats: stats
-                };
-
-                state.units.push(newUnit);
+                });
                 b.queue.shift();
-                console.log(`Successfully spawned ${newUnit.type} for owner ${newUnit.ownerId}`);
             }
         }
     });
@@ -165,12 +154,7 @@ const updateCombat = (state) => {
             unit.y += (dy / distance) * unit.stats.speed;
         } else {
             unit.isMoving = false;
-
-            // Rock-Paper-Scissors: Crusaders (Tanks) vs Buildings (HP > 400)
-            let multiplier = 1.0;
-            if (unit.type === 'crusader' && target.maxHealth > 400) multiplier = 2.0;
-
-            target.health -= (unit.stats.damage / 10) * multiplier;
+            target.health -= (unit.stats.damage / 10);
             if (target.health < 0) target.health = 0;
         }
     });
@@ -181,9 +165,31 @@ const cleanupState = (state) => {
     state.buildings = state.buildings.filter(b => b.health > 0);
 };
 
-/**
- * Main Deterministic Loop
- */
+const checkWinConditions = (state) => {
+    // 1. Grace Period: Don't check in the first 2-3 seconds of the game
+    if (state.tick < 100) return;
+
+    // 2. Identify the player
+    const selfPlayer = state.players[0];
+    if (!selfPlayer || selfPlayer.id === 'self') return; // Wait for Socket ID sync
+
+    const selfId = selfPlayer.id;
+
+    // 3. Count assets
+    const ownBuildings = state.buildings.filter(b => b.ownerId === selfId);
+    const ownUnits = state.units.filter(u => u.ownerId === selfId);
+
+    const enemyBuildings = state.buildings.filter(b => b.ownerId !== selfId);
+    const enemyUnits = state.units.filter(u => u.ownerId !== selfId);
+
+    // 4. Evaluate status
+    if (ownBuildings.length === 0 && ownUnits.length === 0) {
+        state.status = 'DEFEAT';
+    } else if (enemyBuildings.length === 0 && enemyUnits.length === 0) {
+        state.status = 'VICTORY';
+    }
+};
+
 export const runDeterministicEngine = (oldState, commands, newTick) => {
     let newState = JSON.parse(JSON.stringify(oldState));
     newState.tick = newTick;
@@ -195,6 +201,7 @@ export const runDeterministicEngine = (oldState, commands, newTick) => {
     resolveUnitCollisions(newState);
     updateCombat(newState);
     cleanupState(newState);
+    checkWinConditions(newState);
 
     return newState;
 };
