@@ -10,7 +10,7 @@ const server = http.createServer(app);
 // Initialize Socket.io server
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:3000", // Allow connection from React client
+        origin: "http://localhost:5173", // <--- Use 5173 for Vite!
         methods: ["GET", "POST"]
     }
 });
