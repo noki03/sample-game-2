@@ -1,68 +1,42 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+/* client/src/index.css */
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
+/* 1. Global Reset */
+* {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  padding: 0;
+  box-sizing: border-box; /* Ensures padding/border don't change element size */
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
+/* 2. Full-Screen Container Setup (C&C Style) */
+html,
+body,
+#root {
+  /* Set all to fill the viewport */
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Prevent scrollbars when using 100vw/100vh */
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
+  /* Use a dark, technical background color */
   background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  color: #fff; /* White text for contrast */
+  font-family: "Consolas", "Monospace", sans-serif; /* A clear, digital-looking font */
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* 3. The Main App Component Styling */
+#root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 4. Utility Class for the Game View (used in App.jsx) */
+.game-container {
+  /* This is the div that will hold the canvas, command panel, and resource bar */
+  width: 100%;
+  height: 100%;
+  max-width: 1400px; /* Optional: Sets a reasonable max size for the entire game area */
+  position: relative;
+  /* Optional: gives a border to see the boundaries */
+  /* border: 1px solid #00ff88; */
 }

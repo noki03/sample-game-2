@@ -1,35 +1,27 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// client/src/App.jsx (Updated)
+import { useGameStore } from './store/useGameStore';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const gameState = useGameStore((state) => state.gameState);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
+    // Use the class defined in index.css
+    <div className="game-container">
+
+      {/* TEMP UI ELEMENTS (will be replaced by panels) */}
+      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10 }}>
+        <h1>C&C Knockoff Prototype</h1>
+        <p>Game Tick: {gameState.tick}</p>
+        <p>Units on map: {gameState.units.length}</p>
+        <p style={{ color: gameState.tick > 0 ? '#00ff88' : '#ff0000' }}>
+          Status: {gameState.tick > 0 ? 'Synchronized!' : 'Awaiting Server Tick...'}
         </p>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+
+      {/* <GameCanvas /> will render here */}
+
+    </div>
+  );
 }
 
-export default App
+export default App;
