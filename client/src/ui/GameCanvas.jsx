@@ -1,116 +1,209 @@
-// client/src/ui/GameCanvas.jsx
+// src/ui/GameCanvas.jsx
 
-import React, { useRef, useEffect, useCallback } from 'react';
-// We need the state to know what to draw
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
-
-const CANVAS_WIDTH = 1280;
-const CANVAS_HEIGHT = 720;
+import { sendCommand } from '../network/SocketManager';
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../game/constants';
 
 const GameCanvas = () => {
-    // 1. Get the current state
-    const { units, buildings, selectedUnitIds } = useGameStore(state => state.gameState);
+    const gameState = useGameStore(state => state.gameState);
+    const { units, buildings, selectedUnitIds } = gameState;
+    const setSelectedUnits = useGameStore(state => state.setSelectedUnits);
+    const selfPlayerId = useGameStore(state => state.getSelfPlayerId());
 
-    // 2. We use a ref to connect the component to the actual DOM canvas element
     const canvasRef = useRef(null);
 
-    // 3. The Core Drawing Function (Pure Drawing Logic)
-    const drawGame = useCallback((ctx) => {
-        // Clear the entire canvas on every frame
-        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    // --- Selection Box State ---
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [dragEnd, setDragEnd] = useState({ x: 0, y: 0 });
 
-        // --- Draw Map Background (Simplified) ---
-        ctx.fillStyle = '#1e3f1e'; // Dark green terrain
+    const getClickedUnit = useCallback((clickX, clickY) => {
+        return units.find(unit => {
+            return Math.hypot(unit.x - clickX, unit.y - clickY) < 20 && unit.ownerId === selfPlayerId;
+        });
+    }, [units, selfPlayerId]);
+
+    // --- Mouse Handlers ---
+
+    const handleMouseDown = (e) => {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // --- RIGHT CLICK: ISSUE COMMAND ---
+        if (e.button === 2) {
+            if (selectedUnitIds.length > 0) {
+                // Check for Enemy Target (unit or building)
+                const enemyTarget =
+                    units.find(u => u.ownerId !== selfPlayerId && Math.hypot(u.x - x, u.y - y) < 20) ||
+                    buildings.find(b => b.ownerId !== selfPlayerId &&
+                        x >= b.x && x <= b.x + 50 &&
+                        y >= b.y && y <= b.y + 50);
+
+                if (enemyTarget) {
+                    sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetUnitId: enemyTarget.id });
+                } else {
+                    sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetX: x, targetY: y });
+                }
+            }
+            return; // Prevent selection logic from firing
+        }
+
+        // --- LEFT CLICK: START SELECTION ---
+        if (e.button === 0) {
+            setDragStart({ x, y });
+            setDragEnd({ x, y });
+            setIsDragging(true);
+        }
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        setDragEnd({
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        });
+    };
+
+    // Inside src/ui/GameCanvas.jsx
+
+    const handleMouseUp = (e) => {
+        if (e.button !== 0 || !isDragging) {
+            setIsDragging(false);
+            return;
+        }
+
+        setIsDragging(false);
+
+        const rect = canvasRef.current.getBoundingClientRect();
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
+
+        const left = Math.min(dragStart.x, endX);
+        const right = Math.max(dragStart.x, endX);
+        const top = Math.min(dragStart.y, endY);
+        const bottom = Math.max(dragStart.y, endY);
+
+        const dragWidth = right - left;
+        const dragHeight = bottom - top;
+
+        // If it's a drag, select multiple. If it's a click, select single.
+        if (dragWidth > 5 || dragHeight > 5) {
+            const foundIds = units
+                .filter(u => u.ownerId === selfPlayerId)
+                .filter(u => u.x >= left && u.x <= right && u.y >= top && u.y <= bottom)
+                .map(u => u.id);
+            setSelectedUnits(foundIds);
+        } else {
+            const ownUnit = getClickedUnit(endX, endY);
+            setSelectedUnits(ownUnit ? [ownUnit.id] : []); // Clicking ground clears selection
+        }
+    };
+
+    const drawGame = useCallback((ctx) => {
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.fillStyle = '#1e3f1e';
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-        // --- Draw Buildings ---
-        buildings.forEach(building => {
-            const isSelected = selectedUnitIds.includes(building.id);
+        // 1. Draw Buildings
+        buildings.forEach(b => {
+            ctx.fillStyle = b.ownerId === selfPlayerId ? '#888' : '#662222';
+            ctx.fillRect(b.x, b.y, 50, 50);
 
-            // Draw the structure (simple square)
-            ctx.fillStyle = isSelected ? '#fff' : '#888';
-            ctx.fillRect(building.x, building.y, 50, 50);
-
-            // Draw a label
-            ctx.fillStyle = '#fff';
-            ctx.fillText(building.type, building.x, building.y - 5);
+            // Health Bar
+            ctx.fillStyle = '#440000';
+            ctx.fillRect(b.x, b.y - 10, 50, 6);
+            ctx.fillStyle = '#00ff00';
+            ctx.fillRect(b.x, b.y - 10, (b.health / b.maxHealth) * 50, 6);
         });
 
-        // --- Draw Units ---
-        units.forEach(unit => {
-            const isSelected = selectedUnitIds.includes(unit.id);
-            const size = 10;
-
-            // Determine color based on owner (we'll need player colors later)
-            ctx.fillStyle = unit.ownerId === 'self' ? '#007bff' : '#ff0000';
-
-            // Draw the unit (simple circle for a tank/infantry placeholder)
+        // 2. Draw Units
+        units.forEach(u => {
+            const isSelected = selectedUnitIds.includes(u.id);
+            ctx.fillStyle = u.ownerId === selfPlayerId ? '#007bff' : '#ff3333';
             ctx.beginPath();
-            ctx.arc(unit.x, unit.y, size, 0, Math.PI * 2);
+            ctx.arc(u.x, u.y, 10, 0, Math.PI * 2);
             ctx.fill();
 
-            // If selected, draw a selection circle
             if (isSelected) {
                 ctx.strokeStyle = '#00ff00';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(unit.x, unit.y, size + 4, 0, Math.PI * 2);
+                ctx.arc(u.x, u.y, 14, 0, Math.PI * 2);
                 ctx.stroke();
             }
 
-            // Draw health bar placeholder
-            ctx.fillStyle = '#ff0000';
-            ctx.fillRect(unit.x - size, unit.y + size + 2, 2 * size, 3);
+            // Health Bar
+            ctx.fillStyle = '#440000';
+            ctx.fillRect(u.x - 12, u.y + 14, 24, 4);
             ctx.fillStyle = '#00ff00';
-            ctx.fillRect(unit.x - size, unit.y + size + 2, (unit.health / unit.maxHealth) * 2 * size, 3);
+            ctx.fillRect(u.x - 12, u.y + 14, (u.health / u.maxHealth) * 24, 4);
 
-            // Draw movement target (if moving)
-            if (unit.isMoving) {
-                ctx.strokeStyle = '#ffff00';
-                ctx.setLineDash([5, 5]); // Dashed line
-                ctx.beginPath();
-                ctx.moveTo(unit.x, unit.y);
-                ctx.lineTo(unit.targetX, unit.targetY);
-                ctx.stroke();
-                ctx.setLineDash([]); // Reset line style
+            // Combat Tracer
+            if (u.status === 'ATTACKING' && u.targetEntityId && !u.isMoving) {
+                const target = units.find(t => t.id === u.targetEntityId) || buildings.find(t => t.id === u.targetEntityId);
+                if (target) {
+                    ctx.shadowBlur = 5;
+                    ctx.shadowColor = "red";
+                    ctx.strokeStyle = '#ffcc00';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(u.x, u.y);
+                    const tx = target.x + (target.maxHealth >= 500 ? 25 : 0);
+                    const ty = target.y + (target.maxHealth >= 500 ? 25 : 0);
+                    ctx.lineTo(tx, ty);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
             }
         });
 
-    }, [units, buildings, selectedUnitIds]); // Dependencies: Redraw only if state changes
+        // 3. Draw Selection Box
+        if (isDragging) {
+            ctx.strokeStyle = '#00ff00';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+            ctx.strokeRect(
+                dragStart.x,
+                dragStart.y,
+                dragEnd.x - dragStart.x,
+                dragEnd.y - dragStart.y
+            );
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+            ctx.fillRect(
+                dragStart.x,
+                dragStart.y,
+                dragEnd.x - dragStart.x,
+                dragEnd.y - dragStart.y
+            );
+            ctx.setLineDash([]);
+        }
+    }, [units, buildings, selectedUnitIds, selfPlayerId, isDragging, dragStart, dragEnd]);
 
-    // 4. The Render Loop (Uses requestAnimationFrame)
     useEffect(() => {
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        let animationFrameId;
-
-        // The function that draws and requests the next frame
+        const ctx = canvasRef.current.getContext('2d');
+        let frame;
         const render = () => {
-            // Draw using the data retrieved from the Zustand store
             drawGame(ctx);
-            // Request the next frame for smooth animation
-            animationFrameId = window.requestAnimationFrame(render);
+            frame = requestAnimationFrame(render);
         };
-
-        // Start the loop
         render();
+        return () => cancelAnimationFrame(frame);
+    }, [drawGame]);
 
-        // Cleanup function: stop the loop when the component unmounts
-        return () => {
-            window.cancelAnimationFrame(animationFrameId);
-        };
-    }, [drawGame]); // Dependency on drawGame ensures this useEffect knows when to update its logic
-
-    // 5. Render the canvas element
     return (
         <canvas
             ref={canvasRef}
             width={CANVAS_WIDTH}
             height={CANVAS_HEIGHT}
-            style={{
-                border: '2px solid #00ff00',
-                backgroundColor: '#333'
-            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            // ADD THIS LINE:
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ backgroundColor: '#000', display: 'block', margin: '0 auto', cursor: 'crosshair' }}
         />
     );
 };

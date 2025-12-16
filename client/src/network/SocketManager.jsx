@@ -1,4 +1,5 @@
-// client/src/SocketManager.jsx
+// client/src/network/SocketManager.jsx
+
 import React, { useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { useGameStore } from '../store/useGameStore';
@@ -12,32 +13,36 @@ export const SocketManager = ({ children }) => {
 
     useEffect(() => {
         socket.on('connect', () => {
-            console.log('Connected to server via Socket.io');
+            console.log('My Socket ID:', socket.id);
+
+            const currentState = useGameStore.getState().gameState;
+            const updatedState = JSON.parse(JSON.stringify(currentState));
+
+            // CRITICAL: Update the ID of the player and the starting buildings
+            updatedState.players[0].id = socket.id;
+            updatedState.buildings.forEach(b => {
+                if (b.ownerId === 'self') b.ownerId = socket.id;
+            });
+            updatedState.units.forEach(u => {
+                if (u.ownerId === 'self') u.ownerId = socket.id;
+            });
+
+            updateGameState(updatedState);
         });
 
-        // The critical synchronization event
         socket.on('tick_commands', ({ tick, commands }) => {
-            // 1. Run the deterministic logic
-            // Pass the current state from the store and the new commands/tick
-            const newState = runDeterministicEngine(gameState, commands, tick); // <--- Updated call
-
-            // 2. Update the central React store
+            // Now when this runs, the IDs will match!
+            const newState = runDeterministicEngine(gameState, commands, tick);
             updateGameState(newState);
         });
 
-        return () => {
-            socket.off('connect');
-            socket.off('tick_commands');
-        };
-    }, [gameState, updateGameState]); // Dependencies ensure we always have the latest state
+        // ... cleanup ...
+    }, [gameState, updateGameState]);
 
-    return (
-        // Children will be the rest of your app components
-        <>{children}</>
-    );
+    return <>{children}</>;
 };
 
-// Function to send commands from any component
+// Function exposed to other components to send input to the server
 export const sendCommand = (commandType, payload) => {
     socket.emit('player_command', {
         type: commandType,
