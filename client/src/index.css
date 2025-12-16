@@ -32,26 +32,18 @@ body,
 
 /* 4. Utility Class for the Game View (used in App.jsx) */
 .game-container {
-  /* This is the div that will hold the canvas, command panel, and resource bar */
-  width: 100%;
-  height: 100%;
-  max-width: 1400px; /* Optional: Sets a reasonable max size for the entire game area */
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
   position: relative;
-  /* Optional: gives a border to see the boundaries */
-  /* border: 1px solid #00ff88; */
-}
-
-.canvas-attack {
-  /* You can use a URL to a small .png icon for a real target cursor */
-  cursor: crosshair !important;
-}
-
-.canvas-move {
-  cursor: url("https://findicons.com/files/icons/1620/crystal_project/16/cursor_arrow.png"),
-    auto;
+  display: flex;
+  flex-direction: column;
 }
 
 canvas {
-  /* This hides the default mouse so we can draw our own */
+  /* This ensures the canvas only takes up the space NOT used by the panel */
+  height: calc(100vh - 180px) !important;
+  width: 100vw;
+  display: block;
   cursor: none !important;
 }

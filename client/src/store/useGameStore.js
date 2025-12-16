@@ -1,23 +1,17 @@
 // client/src/store/useGameStore.js
-
 import { create } from 'zustand';
 import { INITIAL_STATE } from '../game/constants';
 
 export const useGameStore = create((set, get) => ({
     gameState: INITIAL_STATE,
+    placementMode: null, // Stores the type of building being placed (e.g., 'barracks')
 
     updateGameState: (newGameState) => set({ gameState: newGameState }),
 
-    // Top-level action to change game status
-    setGameStatus: (status) => set(state => ({
-        gameState: { ...state.gameState, status }
-    })),
+    setPlacementMode: (type) => set({ placementMode: type }),
 
     setSelectedUnits: (ids) => set(state => ({
-        gameState: {
-            ...state.gameState,
-            selectedUnitIds: ids
-        }
+        gameState: { ...state.gameState, selectedUnitIds: ids }
     })),
 
     getSelfPlayerId: () => {
