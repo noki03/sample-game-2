@@ -5,7 +5,6 @@ import { UNIT_STATS, BUILDING_STATS } from '../game/constants';
 
 const CommandPanel = () => {
     const gameState = useGameStore(state => state.gameState);
-    // These need to be added to your useGameStore:
     const notification = useGameStore(state => state.notification);
     const setNotification = useGameStore(state => state.setNotification);
 
@@ -22,7 +21,6 @@ const CommandPanel = () => {
     const handlePlaceBuilding = (type) => {
         const stats = BUILDING_STATS[type];
         if (player.resources.money < stats.cost) {
-            // NEW: Use localized notification instead of alert
             return setNotification ? setNotification("INSUFFICIENT FUNDS") : alert("Insufficient Funds!");
         }
         useGameStore.getState().setPlacementMode(type);
@@ -31,7 +29,6 @@ const CommandPanel = () => {
     const handleTrainUnit = (unitType, buildingId) => {
         const stats = UNIT_STATS[unitType];
         if (player.resources.money < stats.cost) {
-            // NEW: Use localized notification instead of alert
             return setNotification ? setNotification("INSUFFICIENT FUNDS") : alert("Insufficient Funds!");
         }
         sendCommand('BUILD_UNIT', { unitType, buildingId });
@@ -55,25 +52,37 @@ const CommandPanel = () => {
         }
     };
 
+    // --- Helper: Render Unit Button with Clockwise Wipe Progress ---
     const renderUnitBtn = (unitType, building) => {
         const stats = UNIT_STATS[unitType];
         const queue = building.queue || [];
+
         const isCurrentlyBuilding = queue[0]?.type === unitType;
+        // Calculate percentage (0 to 100)
         const progress = isCurrentlyBuilding ? (queue[0].progress / queue[0].totalTime) * 100 : 0;
         const countInQueue = queue.filter(item => item.type === unitType).length;
+
+        // Convert progress to degrees for the conic-gradient (0 to 360)
+        const progressDegrees = (progress / 100) * 360;
 
         return (
             <div key={unitType} style={{ position: 'relative' }}>
                 <button
-                    style={styles.btn}
+                    style={{
+                        ...styles.btn,
+                        borderColor: isCurrentlyBuilding ? '#00ff00' : '#555'
+                    }}
+                    className={isCurrentlyBuilding ? "btn-producing" : ""}
                     onClick={() => handleTrainUnit(unitType, building.id)}
                 >
+                    {/* Clockwise Wipe Overlay */}
                     {isCurrentlyBuilding && (
                         <div style={{
-                            ...styles.progressOverlay,
-                            height: `${100 - progress}%`,
+                            ...styles.progressWipe,
+                            background: `conic-gradient(transparent ${progressDegrees}deg, rgba(0,0,0,0.7) ${progressDegrees}deg)`
                         }} />
                     )}
+
                     <span style={{ zIndex: 2 }}>{unitType.toUpperCase()}</span>
                     <span style={{ zIndex: 2, fontSize: '10px', opacity: 0.7 }}>${stats.cost}</span>
                 </button>
@@ -85,6 +94,7 @@ const CommandPanel = () => {
                             e.stopPropagation();
                             handleCancelUnit(building.id, unitType);
                         }}
+                        title="Cancel one"
                     >
                         ✕ <span style={{ fontSize: '9px' }}>{countInQueue}</span>
                     </div>
@@ -95,21 +105,18 @@ const CommandPanel = () => {
 
     return (
         <div style={styles.panel} className="command-panel">
-            {/* NEW: Insufficient Funds Floating Message */}
             {notification && (
                 <div style={styles.notificationOverlay} className="notification-pulse">
                     ⚠️ {notification}
                 </div>
             )}
 
-            {/* 1. Context Tab */}
             {selectedEntities.length === 1 && (
                 <div style={styles.contextLabel}>
                     {selectedEntities[0].type.replace('_', ' ').toUpperCase()}
                 </div>
             )}
 
-            {/* 2. Resources */}
             <div style={styles.resourceSection}>
                 <h2 style={{ color: '#00ff00', margin: 0 }}>${Math.floor(player.resources.money)}</h2>
                 <div style={{ fontSize: '12px', marginTop: '5px' }}>
@@ -119,7 +126,6 @@ const CommandPanel = () => {
                 </div>
             </div>
 
-            {/* 3. Action Area */}
             <div style={styles.buttonArea}>
                 {hasBuilder && (
                     <div style={styles.menuGroup}>
@@ -174,35 +180,16 @@ const CommandPanel = () => {
 
 const styles = {
     panel: {
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        width: '100%',
-        height: '180px',
-        backgroundColor: '#151515',
-        borderTop: '3px solid #00ff00',
-        display: 'flex',
-        padding: '20px',
-        color: '#fff',
-        zIndex: 1000,
-        boxSizing: 'border-box',
-        overflow: 'visible'
+        position: 'fixed', bottom: 0, left: 0, width: '100%', height: '180px',
+        backgroundColor: '#151515', borderTop: '3px solid #00ff00',
+        display: 'flex', padding: '20px', color: '#fff', zIndex: 1000,
+        boxSizing: 'border-box', overflow: 'visible'
     },
-    // NEW Style for the alert
     notificationOverlay: {
-        position: 'absolute',
-        top: '-60px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        backgroundColor: '#ff0000',
-        color: '#fff',
-        padding: '10px 25px',
-        fontWeight: 'bold',
-        fontSize: '14px',
-        borderRadius: '4px',
-        boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)',
-        whiteSpace: 'nowrap',
-        zIndex: 1001
+        position: 'absolute', top: '-60px', left: '50%', transform: 'translateX(-50%)',
+        backgroundColor: '#ff0000', color: '#fff', padding: '10px 25px',
+        fontWeight: 'bold', fontSize: '14px', borderRadius: '4px',
+        boxShadow: '0 0 15px rgba(255, 0, 0, 0.6)', whiteSpace: 'nowrap', zIndex: 1001
     },
     contextLabel: {
         position: 'absolute', top: '-28px', left: '20px', background: '#00ff00',
@@ -222,9 +209,10 @@ const styles = {
         padding: '12px 15px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
         minWidth: '130px', transition: '0.1s', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center'
     },
-    progressOverlay: {
-        position: 'absolute', bottom: 0, left: 0, width: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)', zIndex: 1, pointerEvents: 'none'
+    // Updated style for the Radar Wipe
+    progressWipe: {
+        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+        zIndex: 1, pointerEvents: 'none', background: 'red'
     },
     cancelBadge: {
         position: 'absolute', top: '-8px', right: '-8px', background: '#ff4444',

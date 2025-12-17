@@ -48,6 +48,36 @@ canvas {
   animation: pulse-animation 1s infinite;
 }
 
+/* Radar-style wipe for unit production */
+.progress-wipe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  background-color: rgba(204, 31, 31, 0.7);
+  /* The mask logic will be handled via inline styles in React */
+}
+
+.victory-screen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  /* z-index 1000 is above the Command Panel (10) but below the Cursor Canvas (9999) */
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  pointer-events: auto; /* Crucial: allows clicking the Redeploy button */
+}
+
+/* Optional: Add a subtle glow to the button when it's actively producing */
+
 @keyframes pulse-animation {
   0% {
     transform: translateX(-50%) scale(1);
