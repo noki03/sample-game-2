@@ -15,12 +15,24 @@ const GameCanvas = () => {
     const controls = useGameControls(canvasRef, gameState, selfPlayerId, placementMode, setPlacementMode, setSelectedUnits);
 
     const draw = useCallback((ctx) => {
-        const { units, buildings, selectedUnitIds } = gameState;
+        const { units, buildings, selectedUnitIds, effects } = gameState;
+
+        // Calculate validity here to pass into the UI renderer
+        const isValid = placementMode ? controls.checkPlacementValid(controls.mousePos.x - 25, controls.mousePos.y - 25) : true;
 
         GameRenderer.drawBackground(ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
         GameRenderer.drawBuildings(ctx, buildings, selectedUnitIds, selfPlayerId);
         GameRenderer.drawUnits(ctx, units, selectedUnitIds, selfPlayerId);
-        GameRenderer.drawUI(ctx, { ...controls, selectedUnitIds, placementMode, isHoveringEnemy: checkHover(controls.mousePos) });
+        GameRenderer.drawCombatEffects(ctx, effects);
+
+        // Pass 'isValid' into drawUI
+        GameRenderer.drawUI(ctx, {
+            ...controls,
+            selectedUnitIds,
+            placementMode,
+            isValid, // <--- New prop
+            isHoveringEnemy: checkHover(controls.mousePos)
+        });
     }, [gameState, controls, selfPlayerId, placementMode]);
 
     const checkHover = (pos) => {
