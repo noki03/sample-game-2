@@ -1,4 +1,9 @@
+// src/game/systems/combatSystem.js
+
 export const updateCombat = (state) => {
+    // Initialize an effects array if it doesn't exist for this tick
+    state.effects = [];
+
     state.units.forEach(unit => {
         if (unit.status !== 'ATTACKING' || !unit.targetEntityId) return;
 
@@ -21,7 +26,22 @@ export const updateCombat = (state) => {
             unit.y += (dy / distance) * unit.stats.speed;
         } else {
             unit.isMoving = false;
+
+            // DAMAGE LOGIC
             target.health -= (unit.stats.damage / 10);
+
+            // --- NEW: Add Combat Effect Data ---
+            // Every few ticks, we "fire" a shot
+            if (state.tick % 5 === 0) {
+                state.effects.push({
+                    type: 'TRACER',
+                    fromX: unit.x,
+                    fromY: unit.y,
+                    toX: target.x + (target.width ? target.width / 2 : 0), // Aim for center
+                    toY: target.y + (target.height ? target.height / 2 : 0),
+                    color: unit.type === 'crusader' ? '#ffcc00' : '#ffffff'
+                });
+            }
         }
     });
 };

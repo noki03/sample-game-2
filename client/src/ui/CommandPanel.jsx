@@ -1,5 +1,3 @@
-// client/src/ui/CommandPanel.jsx
-
 import React from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { sendCommand } from '../network/SocketManager';
@@ -10,40 +8,112 @@ const CommandPanel = () => {
     const { units, buildings, selectedUnitIds } = gameState;
     const selfId = useGameStore(state => state.getSelfPlayerId());
 
-    // Find the current player's data
+    // Find current player data
     const player = gameState.players.find(p => p.id === selfId);
     if (!player) return null;
 
     // --- Context Logic ---
     const selectedEntities = [...units, ...buildings].filter(e => selectedUnitIds.includes(e.id));
 
+    // Check what is currently selected
     const hasBuilder = selectedEntities.some(e => e.type === 'builder');
-    const selectedBarracks = selectedEntities.find(e => e.type === 'barracks');
-    const selectedWarFactory = selectedEntities.find(e => e.type === 'war_factory');
+    const activeBuilding = buildings.find(b => selectedUnitIds.includes(b.id) && b.ownerId === selfId);
 
     // --- Action Handlers ---
     const handlePlaceBuilding = (type) => {
         const stats = BUILDING_STATS[type];
         if (player.resources.money < stats.cost) return alert("Insufficient Funds!");
-
-        // This sets a global "placement mode" in your store so the next Canvas click places it
-        // For now, we'll trigger a simplified command or you can use a state for ghost-placement
         useGameStore.getState().setPlacementMode(type);
     };
 
     const handleTrainUnit = (unitType, buildingId) => {
         const stats = UNIT_STATS[unitType];
         if (player.resources.money < stats.cost) return alert("Insufficient Funds!");
+        sendCommand('BUILD_UNIT', { unitType, buildingId });
+    };
 
-        sendCommand('BUILD_UNIT', {
-            unitType,
-            buildingId
-        });
+    const handleBuildingAction = (building) => {
+        if (building.status === 'CONSTRUCTING') {
+            // Instant cancel, no confirmation needed for 100% refund
+            sendCommand('CANCEL_BUILDING', { buildingId: building.id });
+        } else {
+            // Confirmation for selling a finished asset
+            if (window.confirm("Sell this structure for 50% refund?")) {
+                sendCommand('SELL_BUILDING', { buildingId: building.id });
+            }
+        }
+    };
+
+    const handleCancelUnit = (buildingId, unitType) => {
+        // Find the index of the first unit of this type in the queue
+        const building = buildings.find(b => b.id === buildingId);
+        const index = building?.queue.findIndex(item => item.type === unitType);
+
+        if (index !== -1) {
+            sendCommand('CANCEL_PRODUCTION', { buildingId, index });
+        }
+    };
+
+    const handleSellBuilding = (buildingId) => {
+        if (window.confirm("Sell this structure for a 50% refund?")) {
+            sendCommand('SELL_BUILDING', { buildingId });
+        }
+    };
+
+    // --- Helper: Render Unit Button with Progress and Cancel ---
+    const renderUnitBtn = (unitType, building) => {
+        const stats = UNIT_STATS[unitType];
+        const queue = building.queue || [];
+
+        // C&C style: Progress applies only to the item at the front of the queue
+        const isCurrentlyBuilding = queue[0]?.type === unitType;
+        const progress = isCurrentlyBuilding ? (queue[0].progress / queue[0].totalTime) * 100 : 0;
+        const countInQueue = queue.filter(item => item.type === unitType).length;
+
+        return (
+            <div key={unitType} style={{ position: 'relative' }}>
+                <button
+                    style={styles.btn}
+                    onClick={() => handleTrainUnit(unitType, building.id)}
+                >
+                    {/* Progress Wipe Overlay */}
+                    {isCurrentlyBuilding && (
+                        <div style={{
+                            ...styles.progressOverlay,
+                            height: `${100 - progress}%`,
+                        }} />
+                    )}
+                    <span style={{ zIndex: 2 }}>{unitType.toUpperCase()}</span>
+                    <span style={{ zIndex: 2, fontSize: '10px', opacity: 0.7 }}>${stats.cost}</span>
+                </button>
+
+                {/* Cancel Badge (C&C style "X") */}
+                {countInQueue > 0 && (
+                    <div
+                        style={styles.cancelBadge}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleCancelUnit(building.id, unitType);
+                        }}
+                        title="Cancel one"
+                    >
+                        ✕ <span style={{ fontSize: '9px' }}>{countInQueue}</span>
+                    </div>
+                )}
+            </div>
+        );
     };
 
     return (
         <div style={styles.panel}>
-            {/* 1. Resources & Power */}
+            {/* 1. Context Tab (Top Left) */}
+            {selectedEntities.length === 1 && (
+                <div style={styles.contextLabel}>
+                    {selectedEntities[0].type.replace('_', ' ').toUpperCase()}
+                </div>
+            )}
+
+            {/* 2. Resources & Power */}
             <div style={styles.resourceSection}>
                 <h2 style={{ color: '#00ff00', margin: 0 }}>${Math.floor(player.resources.money)}</h2>
                 <div style={{ fontSize: '12px', marginTop: '5px' }}>
@@ -53,55 +123,59 @@ const CommandPanel = () => {
                 </div>
             </div>
 
-            {/* 2. Contextual Menus */}
+            {/* 3. Action Area */}
             <div style={styles.buttonArea}>
-                {/* NEW: Selection Identity Header */}
-                {selectedEntities.length === 1 && (
-                    <div style={{ position: 'absolute', top: '-25px', left: '200px', background: '#00ff00', color: '#000', padding: '2px 10px', fontWeight: 'bold', fontSize: '12px', borderRadius: '3px 3px 0 0' }}>
-                        {selectedEntities[0].type.replace('_', ' ').toUpperCase()}
-                    </div>
-                )}
+
                 {/* BUILDER MENU */}
                 {hasBuilder && (
                     <div style={styles.menuGroup}>
-                        <span style={styles.label}>STRUCTURES:</span>
-                        <button style={styles.btn} onClick={() => handlePlaceBuilding('supply_center')}>
-                            Supply Center (${BUILDING_STATS.supply_center.cost})
-                        </button>
-                        <button style={styles.btn} onClick={() => handlePlaceBuilding('power_generator')}>
-                            Power Gen (${BUILDING_STATS.power_generator.cost})
-                        </button>
-                        <button style={styles.btn} onClick={() => handlePlaceBuilding('barracks')}>
-                            Barracks (${BUILDING_STATS.barracks.cost})
-                        </button>
-                        <button style={styles.btn} onClick={() => handlePlaceBuilding('war_factory')}>
-                            War Factory (${BUILDING_STATS.war_factory.cost})
-                        </button>
+                        <span style={styles.label}>STRUCTURES</span>
+                        {Object.keys(BUILDING_STATS).map(type => (
+                            <button
+                                key={type}
+                                style={styles.btn}
+                                onClick={() => handlePlaceBuilding(type)}
+                            >
+                                {type.replace('_', ' ').toUpperCase()} (${BUILDING_STATS[type].cost})
+                            </button>
+                        ))}
                     </div>
                 )}
 
-                {/* BARRACKS MENU */}
-                {selectedBarracks && (
+                {/* PRODUCTION MENUS */}
+                {activeBuilding?.type === 'barracks' && (
                     <div style={styles.menuGroup}>
-                        <span style={styles.label}>INFANTRY:</span>
-                        <button style={styles.btn} onClick={() => handleTrainUnit('ranger', selectedBarracks.id)}>
-                            Train Ranger ($200)
-                        </button>
+                        <span style={styles.label}>INFANTRY</span>
+                        {renderUnitBtn('ranger', activeBuilding)}
                     </div>
                 )}
 
-                {/* WAR FACTORY MENU */}
-                {selectedWarFactory && (
+                {activeBuilding?.type === 'war_factory' && (
                     <div style={styles.menuGroup}>
-                        <span style={styles.label}>VEHICLES:</span>
-                        <button style={styles.btn} onClick={() => handleTrainUnit('crusader', selectedWarFactory.id)}>
-                            Build Crusader ($800)
+                        <span style={styles.label}>VEHICLES</span>
+                        {renderUnitBtn('crusader', activeBuilding)}
+                    </div>
+                )}
+
+                {/* MANAGEMENT MENU (Sell) */}
+                {activeBuilding && (
+                    <div style={styles.managementGroup}>
+                        <span style={styles.label}>STRUCTURE</span>
+                        <button
+                            style={{
+                                ...styles.btn,
+                                borderColor: activeBuilding.status === 'CONSTRUCTING' ? '#ffcc00' : '#ff4444',
+                                color: activeBuilding.status === 'CONSTRUCTING' ? '#ffcc00' : '#ff4444'
+                            }}
+                            onClick={() => handleBuildingAction(activeBuilding)}
+                        >
+                            {activeBuilding.status === 'CONSTRUCTING' ? 'CANCEL (100%)' : 'SELL (50%)'}
                         </button>
                     </div>
                 )}
 
-                {!hasBuilder && !selectedBarracks && !selectedWarFactory && (
-                    <div style={{ color: '#555', fontStyle: 'italic', paddingTop: '15px' }}>
+                {!hasBuilder && !activeBuilding && (
+                    <div style={{ color: '#555', fontStyle: 'italic', alignSelf: 'center' }}>
                         Select a unit or building to see options
                     </div>
                 )}
@@ -112,62 +186,38 @@ const CommandPanel = () => {
 
 const styles = {
     panel: {
-        position: 'fixed', // Fixed to the bottom of the viewport
-        bottom: 0,
-        left: 0,
-        width: '100%',
-        height: '180px',
-        backgroundColor: '#151515',
-        borderTop: '3px solid #00ff00',
-        display: 'flex',
-        padding: '10px 20px',
-        color: '#fff',
-        zIndex: 1000, // High z-index to stay above everything
-        boxSizing: 'border-box',
+        position: 'fixed', bottom: 0, left: 0, width: '100%', height: '180px',
+        backgroundColor: '#151515', borderTop: '3px solid #00ff00',
+        display: 'flex', padding: '20px', color: '#fff', zIndex: 1000, boxSizing: 'border-box'
+    },
+    contextLabel: {
+        position: 'absolute', top: '-28px', left: '20px', background: '#00ff00',
+        color: '#000', padding: '4px 15px', fontWeight: 'bold', fontSize: '12px',
+        borderRadius: '4px 4px 0 0', textTransform: 'uppercase'
     },
     resourceSection: {
-        width: '180px',
-        borderRight: '2px solid #333',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center'
+        width: '180px', borderRight: '2px solid #333',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center'
     },
-    buttonArea: {
-        flex: 1,
-        paddingLeft: '20px',
-        display: 'flex',
-        alignItems: 'flex-start',
-        overflowX: 'auto' // Allow scrolling if too many menus open
-    },
-    menuGroup: {
-        display: 'flex',
-        flexDirection: 'row', // Change to Row so buttons sit side-by-side
-        flexWrap: 'wrap',     // Wrap to next line if there are many
-        gap: '10px',
-        alignContent: 'flex-start'
-    },
-    label: {
-        display: 'block',
-        width: '100%', // Force label to take own line
-        fontSize: '11px',
-        fontWeight: 'bold',
-        color: '#00ff00',
-        marginBottom: '5px',
-        textTransform: 'uppercase'
-    },
+    buttonArea: { flex: 1, paddingLeft: '30px', display: 'flex', gap: '40px' },
+    menuGroup: { display: 'flex', flexWrap: 'wrap', gap: '10px', alignContent: 'flex-start' },
+    managementGroup: { display: 'flex', flexDirection: 'column', gap: '10px', borderLeft: '1px solid #333', paddingLeft: '20px' },
+    label: { width: '100%', fontSize: '10px', fontWeight: 'bold', color: '#00ff00', marginBottom: '5px', opacity: 0.8 },
     btn: {
-        background: '#2a2a2a',
-        color: '#eee',
-        border: '1px solid #555',
-        padding: '12px 15px',
-        cursor: 'pointer',
-        fontSize: '12px',
-        fontWeight: 'bold',
-        minWidth: '140px',
-        transition: '0.1s',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center'
+        position: 'relative', background: '#2a2a2a', color: '#eee', border: '1px solid #555',
+        padding: '12px 15px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
+        minWidth: '130px', transition: '0.1s', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center'
+    },
+    progressOverlay: {
+        position: 'absolute', bottom: 0, left: 0, width: '100%',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)', zIndex: 1, pointerEvents: 'none'
+    },
+    cancelBadge: {
+        position: 'absolute', top: '-8px', right: '-8px', background: '#ff4444',
+        color: '#fff', width: '24px', height: '24px', borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', zIndex: 10,
+        boxShadow: '0 0 5px rgba(0,0,0,0.5)', border: '1px solid #fff'
     }
 };
 
