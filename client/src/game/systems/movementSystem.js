@@ -1,22 +1,33 @@
 // src/game/systems/movementSystem.js
+import { UNIT_STATS } from '../constants';
 
 export const updateUnitMovement = (state) => {
     state.units.forEach(unit => {
-        if (!unit.isMoving || unit.status !== 'MOVING') return;
+        if (!unit.isMoving) return;
 
         const dx = unit.targetX - unit.x;
         const dy = unit.targetY - unit.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance <= 5) {
+        // Builders stop slightly further away to start working
+        const stopRange = unit.status === 'MOVING_TO_BUILD' ? 40 : 5;
+
+        if (distance <= stopRange) {
             unit.x = unit.targetX;
             unit.y = unit.targetY;
             unit.isMoving = false;
-            unit.status = 'IDLE';
+
+            // Task transition: Move -> Work
+            if (unit.status === 'MOVING_TO_BUILD') {
+                unit.status = 'CONSTRUCTING';
+            } else {
+                unit.status = 'IDLE';
+            }
             return;
         }
 
-        const speed = unit.stats.speed || 5;
+        const stats = UNIT_STATS[unit.type];
+        const speed = stats?.speed || 5;
         unit.x += (dx / distance) * speed;
         unit.y += (dy / distance) * speed;
     });

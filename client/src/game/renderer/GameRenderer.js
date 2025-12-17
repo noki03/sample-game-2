@@ -17,13 +17,29 @@ export const GameRenderer = {
         buildings.forEach(b => {
             const isSelected = selectedUnitIds.includes(b.id);
             const teamColor = b.ownerId === selfPlayerId ? '#007bff' : '#ff3333';
-            ctx.fillStyle = b.status === 'CONSTRUCTING' ? '#444' : teamColor;
-            ctx.fillRect(b.x, b.y, 50, 50);
 
-            // --- RESTORED BUILDING ICONS ---
-            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-            ctx.lineWidth = 2;
-            if (b.status === 'READY') {
+            if (b.status === 'CONSTRUCTING') {
+                // --- ZERO HOUR CONSTRUCTION FRAME (SCAFFOLDING) ---
+                // Draw dashed outline to represent a frame
+                ctx.strokeStyle = '#888';
+                ctx.setLineDash([4, 4]);
+                ctx.lineWidth = 2;
+                ctx.strokeRect(b.x, b.y, 50, 50);
+                ctx.setLineDash([]);
+
+                // Draw Progress Fill (Fills from bottom to top)
+                const progressRatio = b.health / b.maxHealth;
+                const progressHeight = 50 * progressRatio;
+                ctx.fillStyle = 'rgba(100, 100, 100, 0.4)';
+                ctx.fillRect(b.x, b.y + 50 - progressHeight, 50, progressHeight);
+            } else {
+                // --- COMPLETED BUILDING ---
+                ctx.fillStyle = teamColor;
+                ctx.fillRect(b.x, b.y, 50, 50);
+
+                // Identification Icons (Greebles)
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 2;
                 if (b.type === 'power_generator') {
                     ctx.beginPath(); ctx.moveTo(b.x + 15, b.y + 40); ctx.lineTo(b.x + 25, b.y + 10); ctx.lineTo(b.x + 35, b.y + 25); ctx.stroke();
                 } else if (b.type === 'barracks') {
@@ -38,7 +54,7 @@ export const GameRenderer = {
                 }
             }
 
-            // --- RESTORED RALLY POINT ---
+            // Rally Point (Only for completed production buildings)
             if (isSelected && prodTypes.includes(b.type) && b.rallyPoint && b.status === 'READY') {
                 ctx.beginPath();
                 ctx.setLineDash([5, 5]);
@@ -51,9 +67,14 @@ export const GameRenderer = {
                 ctx.fillRect(b.rallyPoint.x - 3, b.rallyPoint.y - 3, 6, 6);
             }
 
+            // Selection Bracket
             if (isSelected) {
-                ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 2; ctx.strokeRect(b.x - 4, b.y - 4, 58, 58);
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(b.x - 4, b.y - 4, 58, 58);
             }
+
+            // Health Bar
             GameRenderer.drawHealthBar(ctx, b.x, b.y - 12, 50, 6, b.health / b.maxHealth, b.status === 'CONSTRUCTING' ? '#ffff00' : '#00ff00');
         });
     },
@@ -62,11 +83,40 @@ export const GameRenderer = {
         units.forEach(u => {
             const isSelected = selectedUnitIds.includes(u.id);
             ctx.fillStyle = u.ownerId === selfPlayerId ? '#007bff' : '#ff3333';
-            ctx.beginPath(); ctx.arc(u.x, u.y, 10, 0, Math.PI * 2); ctx.fill();
-            if (isSelected) {
-                ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.arc(u.x, u.y, 14, 0, Math.PI * 2); ctx.stroke();
+
+            // Visual Distinction for Builders
+            if (u.type === 'builder') {
+                ctx.fillRect(u.x - 8, u.y - 8, 16, 16); // Square for builders
+
+                // --- WORKING VISUAL CUE ---
+                // If builder is constructing, add an orange "working" ring
+                if (u.status === 'CONSTRUCTING') {
+                    ctx.strokeStyle = '#ffa500';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(u.x, u.y, 18, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            } else {
+                ctx.beginPath(); // Circle for combat units
+                ctx.arc(u.x, u.y, 10, 0, Math.PI * 2);
+                ctx.fill();
             }
+
+            // Unit Selection Circle/Square
+            if (isSelected) {
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                if (u.type === 'builder') {
+                    ctx.strokeRect(u.x - 11, u.y - 11, 22, 22);
+                } else {
+                    ctx.arc(u.x, u.y, 14, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            // Unit Health Bar
             GameRenderer.drawHealthBar(ctx, u.x - 12, u.y + 14, 24, 4, u.health / u.maxHealth, '#00ff00');
         });
     },
@@ -75,36 +125,55 @@ export const GameRenderer = {
         if (!effects) return;
         effects.forEach(fx => {
             if (fx.type === 'TRACER') {
-                ctx.beginPath(); ctx.strokeStyle = fx.color || '#ffffff'; ctx.lineWidth = 1.5;
-                ctx.moveTo(fx.fromX, fx.fromY); ctx.lineTo(fx.toX, fx.toY); ctx.stroke();
-                ctx.fillStyle = '#ffaa00'; ctx.beginPath(); ctx.arc(fx.toX, fx.toY, 3 + Math.random() * 3, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.strokeStyle = fx.color || '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.moveTo(fx.fromX, fx.fromY);
+                ctx.lineTo(fx.toX, fx.toY);
+                ctx.stroke();
+
+                // Muzzle/Impact flash
+                ctx.fillStyle = '#ffaa00';
+                ctx.beginPath();
+                ctx.arc(fx.toX, fx.toY, 3 + Math.random() * 3, 0, Math.PI * 2);
+                ctx.fill();
             }
         });
     },
 
     drawHealthBar: (ctx, x, y, w, h, percent, color) => {
-        ctx.fillStyle = '#440000'; ctx.fillRect(x, y, w, h);
-        ctx.fillStyle = color; ctx.fillRect(x, y, w * Math.max(0, percent), h);
+        ctx.fillStyle = '#440000';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, w * Math.max(0, percent), h);
     },
 
     drawUI: (ctx, { isDragging, dragStart, dragEnd, ripples, placementMode, mousePos, isValid }) => {
+        // Selection Box
         if (isDragging) {
-            ctx.strokeStyle = '#00ff00'; ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = '#00ff00';
+            ctx.setLineDash([5, 5]);
             ctx.strokeRect(dragStart.x, dragStart.y, dragEnd.x - dragStart.x, dragEnd.y - dragStart.y);
             ctx.setLineDash([]);
         }
 
+        // Right-click Ripples
         ripples.forEach(r => {
-            ctx.strokeStyle = `rgba(0, 255, 0, ${r.alpha})`; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.arc(r.x, r.y, 20 * (1.5 - r.alpha), 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = `rgba(0, 255, 0, ${r.alpha})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, 20 * (1.5 - r.alpha), 0, Math.PI * 2);
+            ctx.stroke();
         });
 
+        // Building Ghost Placement
         if (placementMode) {
             ctx.globalAlpha = 0.4;
             ctx.fillStyle = isValid ? '#00ff00' : '#ff0000';
             ctx.fillRect(mousePos.x - 25, mousePos.y - 25, 50, 50);
             ctx.globalAlpha = 1.0;
-            ctx.strokeStyle = isValid ? '#00ff00' : '#ff0000'; ctx.lineWidth = 2;
+            ctx.strokeStyle = isValid ? '#00ff00' : '#ff0000';
+            ctx.lineWidth = 2;
             ctx.strokeRect(mousePos.x - 25, mousePos.y - 25, 50, 50);
         }
     }

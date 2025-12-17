@@ -53,21 +53,37 @@ export const useGameControls = (canvasRef, gameState, selfPlayerId, placementMod
         }
 
         // Right Click (Rally Point / Move)
-        if (e.button === 2) {
+        if (e.button === 2) { // Right Click
             if (placementMode) { setPlacementMode(null); return; }
             const { selectedUnitIds, buildings, units } = gameState;
 
-            const selectedBuilding = buildings.find(b => selectedUnitIds.includes(b.id) && b.ownerId === selfPlayerId);
-            const prodTypes = ['barracks', 'war_factory', 'command_center'];
+            // 1. Check if clicking on a construction frame to resume work
+            const targetFrame = buildings.find(b =>
+                b.status === 'CONSTRUCTING' &&
+                x >= b.x && x <= b.x + 50 &&
+                y >= b.y && y <= b.y + 50
+            );
 
-            if (selectedBuilding && selectedUnitIds.length === 1 && prodTypes.includes(selectedBuilding.type)) {
-                sendCommand('SET_RALLY_POINT', { buildingId: selectedBuilding.id, x, y });
-            } else if (selectedUnitIds.length > 0) {
-                const target = units.find(u => u.ownerId !== selfPlayerId && Math.hypot(u.x - x, u.y - y) < 20) ||
-                    buildings.find(b => b.ownerId !== selfPlayerId && x >= b.x && x <= b.x + 50 && y >= b.y && y <= b.y + 50);
+            if (targetFrame && selectedUnitIds.length > 0) {
+                // If builders are selected, tell them to go to the frame
+                sendCommand('MOVE_UNITS', {
+                    unitIds: selectedUnitIds,
+                    targetUnitId: targetFrame.id
+                });
+            } else {
+                // ... (Standard Rally Point and Move/Attack logic)
+                const selectedBuilding = buildings.find(b => selectedUnitIds.includes(b.id) && b.ownerId === selfPlayerId);
+                const prodTypes = ['barracks', 'war_factory', 'command_center'];
 
-                if (target) sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetUnitId: target.id });
-                else sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetX: x, targetY: y });
+                if (selectedBuilding && selectedUnitIds.length === 1 && prodTypes.includes(selectedBuilding.type)) {
+                    sendCommand('SET_RALLY_POINT', { buildingId: selectedBuilding.id, x, y });
+                } else if (selectedUnitIds.length > 0) {
+                    const target = units.find(u => u.ownerId !== selfPlayerId && Math.hypot(u.x - x, u.y - y) < 20) ||
+                        buildings.find(b => b.ownerId !== selfPlayerId && x >= b.x && x <= b.x + 50 && y >= b.y && y <= b.y + 50);
+
+                    if (target) sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetUnitId: target.id });
+                    else sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetX: x, targetY: y });
+                }
             }
             setRipples(prev => [...prev, { id: Date.now(), x, y, alpha: 1.0 }]);
         }

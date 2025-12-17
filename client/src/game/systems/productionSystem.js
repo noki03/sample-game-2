@@ -3,15 +3,31 @@ import { BUILDING_STATS, UNIT_STATS } from '../constants';
 export const updateConstruction = (state) => {
     state.buildings.forEach(b => {
         if (b.status === 'CONSTRUCTING') {
-            const stats = BUILDING_STATS[b.type];
-            const targetTime = stats?.buildTime || 300; // Use stat or default
+            // Find a builder assigned to this building and currently "at work"
+            const activeBuilder = state.units.find(u =>
+                u.ownerId === b.ownerId &&
+                u.status === 'CONSTRUCTING' &&
+                u.task?.targetId === b.id
+            );
 
-            b.progress += 1;
-            b.health = Math.min(b.maxHealth, (b.progress / targetTime) * b.maxHealth);
+            if (activeBuilder) {
+                const stats = BUILDING_STATS[b.type];
+                const targetTime = stats?.buildTime || 300;
 
-            if (b.progress >= targetTime) {
-                b.status = 'READY';
-                b.health = b.maxHealth;
+                // Progress only increments when a builder is present
+                b.progress += 1;
+                // Preserve health/progress: it doesn't reset to 0 if the builder leaves
+                b.health = Math.min(b.maxHealth, (b.progress / targetTime) * b.maxHealth);
+
+                if (b.progress >= targetTime) {
+                    b.status = 'READY';
+                    b.health = b.maxHealth;
+                    activeBuilder.status = 'IDLE';
+                    activeBuilder.task = null;
+                }
+            } else {
+                // If no builder is nearby, the building just stays at its current health/progress
+                // This acts as a "Pause"
             }
         }
     });

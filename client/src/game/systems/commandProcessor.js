@@ -2,10 +2,6 @@ import { UNIT_STATS, BUILDING_STATS } from '../constants';
 
 /**
  * Checks if a proposed building location overlaps with existing structures.
- * @param {Object} state - Current game state
- * @param {number} x - Target X coordinate
- * @param {number} y - Target Y coordinate
- * @returns {boolean} - True if the area is occupied
  */
 const isAreaOccupied = (state, x, y) => {
     const buildSize = 50;
@@ -19,7 +15,7 @@ const isAreaOccupied = (state, x, y) => {
             y + margin > b.y + 50);
     });
 
-    // Check against units (prevents trapping units inside walls)
+    // Check against units
     const unitOverlap = state.units.some(u => {
         return (u.x >= x && u.x <= x + buildSize &&
             u.y >= y && u.y <= y + buildSize);
@@ -32,29 +28,49 @@ export const processCommands = (state, commands) => {
     commands.forEach(command => {
         const { type, payload, playerId } = command;
 
-        // --- Place Building (with Collision Detection) ---
+        // --- Place Building (C&C Generals Zero Hour Style) ---
         if (type === 'PLACE_BUILDING') {
             const player = state.players.find(p => p.id === playerId);
             const stats = BUILDING_STATS[payload.buildingType];
 
             if (player && player.resources.money >= stats.cost) {
-                // Verify the location is clear before proceeding
                 if (!isAreaOccupied(state, payload.x, payload.y)) {
+                    // 1. Deduct resources upfront
                     player.resources.money -= stats.cost;
+
+                    const newBuildingId = Date.now() + Math.random();
+
+                    // 2. Create the "Frame" foundation (starts with 1 HP)
                     state.buildings.push({
-                        id: Date.now() + Math.random(),
+                        id: newBuildingId,
                         ownerId: playerId,
                         type: payload.buildingType,
                         x: payload.x,
                         y: payload.y,
-                        health: 10,
+                        health: 1,
                         maxHealth: stats.maxHealth,
                         status: 'CONSTRUCTING',
                         progress: 0,
                         queue: [],
-                        // Default rally point slightly in front of the building
                         rallyPoint: { x: payload.x + 25, y: payload.y + 80 }
                     });
+
+                    // 3. Find the nearest builder and assign the task
+                    const builder = state.units
+                        .filter(u => u.ownerId === playerId && u.type === 'builder' && u.status !== 'MOVING_TO_BUILD')
+                        .sort((a, b) => {
+                            const distA = Math.hypot(a.x - payload.x, a.y - payload.y);
+                            const distB = Math.hypot(b.x - payload.x, b.y - payload.y);
+                            return distA - distB;
+                        })[0];
+
+                    if (builder) {
+                        builder.targetX = payload.x + 25; // Target center of building
+                        builder.targetY = payload.y + 25;
+                        builder.isMoving = true;
+                        builder.status = 'MOVING_TO_BUILD'; // New status for construction transit
+                        builder.task = { type: 'CONSTRUCT', targetId: newBuildingId }; // Assign specific task
+                    }
                 }
             }
         }
@@ -74,15 +90,30 @@ export const processCommands = (state, commands) => {
             payload.unitIds.forEach(unitId => {
                 const unit = state.units.find(u => u.id === unitId);
                 if (unit && unit.ownerId === playerId) {
-                    if (!payload.targetUnitId) {
-                        // Move to ground
+
+                    // Check if the target is a building under construction
+                    const targetBuilding = state.buildings.find(b =>
+                        payload.targetUnitId === b.id && b.status === 'CONSTRUCTING'
+                    );
+
+                    if (targetBuilding && unit.type === 'builder') {
+                        // Manual re-assignment to a building frame
+                        unit.targetX = targetBuilding.x + 25;
+                        unit.targetY = targetBuilding.y + 25;
+                        unit.isMoving = true;
+                        unit.status = 'MOVING_TO_BUILD';
+                        unit.task = { type: 'CONSTRUCT', targetId: targetBuilding.id };
+                    } else if (!payload.targetUnitId) {
+                        // Move to ground: Clear construction task
                         unit.targetX = payload.targetX;
                         unit.targetY = payload.targetY;
                         unit.isMoving = true;
                         unit.status = 'MOVING';
+                        unit.task = null;
                         unit.targetEntityId = null;
                     } else if (unit.stats.damage > 0) {
-                        // Attack Target (Only if unit has damage stats)
+                        // Attack Target
+                        unit.task = null;
                         unit.targetEntityId = payload.targetUnitId;
                         unit.status = 'ATTACKING';
                         unit.isMoving = false;
@@ -91,7 +122,7 @@ export const processCommands = (state, commands) => {
             });
         }
 
-        // --- Unit Production (Training) ---
+        // --- Unit Production (Only for completed buildings) ---
         if (type === 'BUILD_UNIT') {
             const player = state.players.find(p => p.id === playerId);
             const building = state.buildings.find(b => b.id === payload.buildingId);
@@ -107,29 +138,36 @@ export const processCommands = (state, commands) => {
             }
         }
 
+        // --- Cancel Construction ---
         if (type === 'CANCEL_BUILDING') {
             const buildingIndex = state.buildings.findIndex(b => b.id === payload.buildingId);
             const player = state.players.find(p => p.id === playerId);
 
             if (buildingIndex !== -1 && player) {
                 const building = state.buildings[buildingIndex];
-                // Only allow cancel if it's still being built
                 if (building.status === 'CONSTRUCTING') {
                     const stats = BUILDING_STATS[building.type];
                     player.resources.money += stats.cost; // Full refund
+
+                    // Release assigned builder
+                    const builder = state.units.find(u => u.task?.targetId === building.id);
+                    if (builder) {
+                        builder.task = null;
+                        builder.status = 'IDLE';
+                    }
+
                     state.buildings.splice(buildingIndex, 1);
                 }
             }
         }
 
-        // --- SELL_BUILDING (50% Refund) ---
+        // --- Sell Finished Building ---
         if (type === 'SELL_BUILDING') {
             const buildingIndex = state.buildings.findIndex(b => b.id === payload.buildingId);
             const player = state.players.find(p => p.id === playerId);
 
             if (buildingIndex !== -1 && player) {
                 const building = state.buildings[buildingIndex];
-                // Only allow sell if it's finished
                 if (building.status === 'READY') {
                     const stats = BUILDING_STATS[building.type];
                     player.resources.money += Math.floor(stats.cost * 0.5); // 50% refund

@@ -4,7 +4,7 @@
   box-sizing: border-box;
   /* Define the custom RTS cursor globally. The browser handles this with 0 lag. */
   /* cursor: url("https://cur.cursors-4u.net/games/gam-4/gam373.cur"), auto !important; */
-  cursor: url("https://cursor-custom.com/cursors/crosshair2.png"), crosshair !important;
+  cursor: crosshair !important;
 }
 
 html,
