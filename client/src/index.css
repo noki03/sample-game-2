@@ -4,46 +4,82 @@
 * {
   margin: 0;
   padding: 0;
-  box-sizing: border-box; /* Ensures padding/border don't change element size */
+  box-sizing: border-box;
+  /* Hide the system mouse everywhere so our software cursor takes over */
+  cursor: none !important;
 }
 
-/* 2. Full-Screen Container Setup (C&C Style) */
+/* 2. Viewport Setup */
 html,
 body,
 #root {
-  /* Set all to fill the viewport */
   width: 100%;
   height: 100%;
-  overflow: hidden; /* Prevent scrollbars when using 100vw/100vh */
-
-  /* Use a dark, technical background color */
-  background-color: #1a1a1a;
-  color: #fff; /* White text for contrast */
-  font-family: "Consolas", "Monospace", sans-serif; /* A clear, digital-looking font */
+  overflow: hidden; /* Prevent accidental scrolling */
+  background-color: #000; /* Deep black background */
+  color: #fff;
+  font-family: "Consolas", "Monospace", sans-serif;
 }
 
-/* 3. The Main App Component Styling */
-#root {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 4. Utility Class for the Game View (used in App.jsx) */
+/* 3. The App Container */
 .game-container {
   width: 100vw;
   height: 100vh;
-  overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
 }
 
+/* 4. The Unified Software Cursor Canvas (TOP LAYER) */
 canvas {
-  /* This ensures the canvas only takes up the space NOT used by the panel */
-  height: calc(100vh - 180px) !important;
-  width: 100vw;
+  position: fixed; /* Stays locked to the viewport */
+  top: 0;
+  left: 0;
+  width: 100vw !important;
+  height: 100vh !important;
   display: block;
-  cursor: none !important;
+  /* Z-INDEX 9999 ensures the crosshair draws over the buttons.
+     POINTER-EVENTS NONE allows you to click "through" the canvas 
+     to hit the HTML buttons or the input layer underneath. */
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* 5. The Command Panel (MIDDLE LAYER) */
+.command-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 180px;
+  background-color: #151515;
+  border-top: 3px solid #00ff00; /* C&C Green accent */
+  /* Z-INDEX 10 sits behind the cursor canvas but above the game input */
+  z-index: 10;
+  pointer-events: auto; /* Re-enable clicking for buttons */
+  display: flex;
+  box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
+}
+
+/* 6. The Game Input Layer (BOTTOM INTERACTION LAYER) */
+.input-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  /* Captures game clicks only in the area NOT covered by the UI panel */
+  height: calc(100vh - 180px);
+  z-index: 5;
+  background: transparent;
+  pointer-events: auto;
+}
+
+/* 7. Utility Styles for the Command Panel Buttons */
+.command-panel button {
+  transition: all 0.1s ease;
+}
+
+.command-panel button:active {
+  transform: scale(0.95);
+  filter: brightness(1.2);
 }
