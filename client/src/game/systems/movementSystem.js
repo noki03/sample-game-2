@@ -5,23 +5,27 @@ export const updateUnitMovement = (state) => {
     state.units.forEach(unit => {
         if (!unit.isMoving) return;
 
-        // Decrement ignore timer if it exists
-        if (unit.ignoreCollisionTicks > 0) {
-            unit.ignoreCollisionTicks--;
-        }
-
         const dx = unit.targetX - unit.x;
         const dy = unit.targetY - unit.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        const stopRange = unit.status === 'MOVING_TO_BUILD' ? 40 : 5;
+        // Standard stop range
+        const stopRange = unit.status === 'MOVING_TO_BUILD' ? 5 : 5;
+
         if (distance <= stopRange) {
+            unit.x = unit.targetX;
+            unit.y = unit.targetY;
             unit.isMoving = false;
-            unit.status = unit.status === 'MOVING_TO_BUILD' ? 'CONSTRUCTING' : 'IDLE';
+
+            if (unit.status === 'MOVING_TO_BUILD') {
+                unit.status = 'CONSTRUCTING';
+            } else {
+                unit.status = 'IDLE';
+            }
             return;
         }
 
-        const stats = unit.stats || { speed: 5 };
+        const stats = unit.stats || UNIT_STATS[unit.type] || { speed: 5 };
         const moveX = (dx / distance) * stats.speed;
         const moveY = (dy / distance) * stats.speed;
 
@@ -29,8 +33,10 @@ export const updateUnitMovement = (state) => {
         const nextY = unit.y + moveY;
         const unitRadius = 10;
 
-        // FIX: Check collisions ONLY if the unit isn't in its "spawn protection" phase
-        const willHitBuilding = unit.ignoreCollisionTicks > 0 ? false : state.buildings.some(b => {
+        // NEW LOGIC: Only collide with buildings that are 'READY'
+        const willHitBuilding = state.buildings.some(b => {
+            if (b.status === 'CONSTRUCTING') return false; // Walk through ghosts
+
             return (nextX + unitRadius > b.x &&
                 nextX - unitRadius < b.x + 50 &&
                 nextY + unitRadius > b.y &&
@@ -41,11 +47,8 @@ export const updateUnitMovement = (state) => {
             unit.x = nextX;
             unit.y = nextY;
         } else {
-            // If they hit something, stop and wait for a new order
             unit.isMoving = false;
             unit.status = 'IDLE';
-            unit.targetX = null;
-            unit.targetY = null;
         }
     });
 };

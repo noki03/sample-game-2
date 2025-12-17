@@ -1,13 +1,9 @@
+// src/game/systems/productionSystem.js
 import { BUILDING_STATS, UNIT_STATS } from '../constants';
 
-/**
- * Handles the construction of building frames (Zero Hour Style).
- * Progress only increments if an assigned builder is within range and "working".
- */
 export const updateConstruction = (state) => {
     state.buildings.forEach(b => {
         if (b.status === 'CONSTRUCTING') {
-            // Find a builder assigned to this building and currently "at work" (in CONSTRUCTING status)
             const activeBuilder = state.units.find(u =>
                 u.ownerId === b.ownerId &&
                 u.status === 'CONSTRUCTING' &&
@@ -18,22 +14,39 @@ export const updateConstruction = (state) => {
                 const stats = BUILDING_STATS[b.type];
                 const targetTime = stats?.buildTime || 300;
 
-                // Progress only increments when a builder is present at the frame
                 b.progress += 1;
-
-                // preserve progress/health even if the builder is interrupted later
                 b.health = Math.min(b.maxHealth, (b.progress / targetTime) * b.maxHealth);
 
                 if (b.progress >= targetTime) {
                     b.status = 'READY';
                     b.health = b.maxHealth;
 
-                    // Release the builder to an IDLE state
+                    // NEW: Eject units caught inside the building
+                    ejectUnitsFromBuilding(state, b);
+
                     activeBuilder.status = 'IDLE';
                     activeBuilder.task = null;
                 }
             }
-            // If no builder is present, construction is effectively "paused"
+        }
+    });
+};
+
+/**
+ * Pushes any units inside the building footprint to the outside edge.
+ */
+const ejectUnitsFromBuilding = (state, building) => {
+    const margin = 15; // Distance to move outside the 50x50 box
+    state.units.forEach(u => {
+        // Check if unit is inside building bounds
+        if (u.x > building.x && u.x < building.x + 50 &&
+            u.y > building.y && u.y < building.y + 50) {
+
+            // Move unit to the bottom edge by default (Zero Hour style)
+            u.y = building.y + 50 + margin;
+            u.targetX = null;
+            u.targetY = null;
+            u.isMoving = false;
         }
     });
 };

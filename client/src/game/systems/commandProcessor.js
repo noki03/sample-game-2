@@ -66,11 +66,11 @@ export const processCommands = (state, commands) => {
                         })[0];
 
                     if (builder) {
-                        builder.targetX = payload.x + 25; // Target center of building
+                        builder.targetX = payload.x + 25; // Move exactly to center
                         builder.targetY = payload.y + 25;
                         builder.isMoving = true;
-                        builder.status = 'MOVING_TO_BUILD'; // New status for construction transit
-                        builder.task = { type: 'CONSTRUCT', targetId: newBuildingId }; // Assign specific task
+                        builder.status = 'MOVING_TO_BUILD';
+                        builder.task = { type: 'CONSTRUCT', targetId: newBuildingId };
                     }
                 }
             }
