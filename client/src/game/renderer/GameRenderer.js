@@ -1,14 +1,13 @@
 export const GameRenderer = {
     drawBackground: (ctx, width, height) => {
-        const worldHeight = height - 180;
         ctx.fillStyle = '#1e3f1e';
-        ctx.fillRect(0, 0, width, worldHeight);
+        ctx.fillRect(0, 0, width, height);
         ctx.strokeStyle = 'rgba(0,0,0,0.1)';
         ctx.lineWidth = 1;
         for (let x = 0; x < width; x += 50) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, worldHeight); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
         }
-        for (let y = 0; y < worldHeight; y += 50) {
+        for (let y = 0; y < height; y += 50) {
             ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
         }
     },
@@ -18,11 +17,10 @@ export const GameRenderer = {
         buildings.forEach(b => {
             const isSelected = selectedUnitIds.includes(b.id);
             const teamColor = b.ownerId === selfPlayerId ? '#007bff' : '#ff3333';
-
             ctx.fillStyle = b.status === 'CONSTRUCTING' ? '#444' : teamColor;
             ctx.fillRect(b.x, b.y, 50, 50);
 
-            // Identification Greebles
+            // --- RESTORED BUILDING ICONS ---
             ctx.strokeStyle = 'rgba(255,255,255,0.5)';
             ctx.lineWidth = 2;
             if (b.status === 'READY') {
@@ -40,11 +38,17 @@ export const GameRenderer = {
                 }
             }
 
-            // Rally Point Logic
+            // --- RESTORED RALLY POINT ---
             if (isSelected && prodTypes.includes(b.type) && b.rallyPoint && b.status === 'READY') {
-                ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(0, 255, 0, 0.6)';
-                ctx.moveTo(b.x + 25, b.y + 25); ctx.lineTo(b.rallyPoint.x, b.rallyPoint.y); ctx.stroke(); ctx.setLineDash([]);
-                ctx.fillStyle = '#00ff00'; ctx.fillRect(b.rallyPoint.x - 3, b.rallyPoint.y - 3, 6, 6);
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = 'rgba(0, 255, 0, 0.6)';
+                ctx.moveTo(b.x + 25, b.y + 25);
+                ctx.lineTo(b.rallyPoint.x, b.rallyPoint.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(b.rallyPoint.x - 3, b.rallyPoint.y - 3, 6, 6);
             }
 
             if (isSelected) {
@@ -59,7 +63,10 @@ export const GameRenderer = {
             const isSelected = selectedUnitIds.includes(u.id);
             ctx.fillStyle = u.ownerId === selfPlayerId ? '#007bff' : '#ff3333';
             ctx.beginPath(); ctx.arc(u.x, u.y, 10, 0, Math.PI * 2); ctx.fill();
-            if (isSelected) { ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(u.x, u.y, 14, 0, Math.PI * 2); ctx.stroke(); }
+            if (isSelected) {
+                ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(u.x, u.y, 14, 0, Math.PI * 2); ctx.stroke();
+            }
             GameRenderer.drawHealthBar(ctx, u.x - 12, u.y + 14, 24, 4, u.health / u.maxHealth, '#00ff00');
         });
     },
@@ -80,34 +87,25 @@ export const GameRenderer = {
         ctx.fillStyle = color; ctx.fillRect(x, y, w * Math.max(0, percent), h);
     },
 
-    drawUI: (ctx, { isDragging, dragStart, dragEnd, ripples, placementMode, mousePos, isValid, isHoveringEnemy, selectedUnitIds }) => {
-        const worldHeight = ctx.canvas.height - 180;
-        if (isDragging && dragStart.y < worldHeight) {
+    drawUI: (ctx, { isDragging, dragStart, dragEnd, ripples, placementMode, mousePos, isValid }) => {
+        if (isDragging) {
             ctx.strokeStyle = '#00ff00'; ctx.setLineDash([5, 5]);
-            ctx.strokeRect(dragStart.x, dragStart.y, dragEnd.x - dragStart.x, dragEnd.y - dragStart.y); ctx.setLineDash([]);
+            ctx.strokeRect(dragStart.x, dragStart.y, dragEnd.x - dragStart.x, dragEnd.y - dragStart.y);
+            ctx.setLineDash([]);
         }
+
         ripples.forEach(r => {
             ctx.strokeStyle = `rgba(0, 255, 0, ${r.alpha})`; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.arc(r.x, r.y, 20 * (1.5 - r.alpha), 0, Math.PI * 2); ctx.stroke();
         });
-        if (placementMode && mousePos.y < worldHeight) {
-            ctx.globalAlpha = 0.4; ctx.fillStyle = isValid ? '#00ff00' : '#ff0000';
-            ctx.fillRect(mousePos.x - 25, mousePos.y - 25, 50, 50);
-            ctx.globalAlpha = 1.0; ctx.strokeStyle = isValid ? '#00ff00' : '#ff0000';
-            ctx.lineWidth = 2; ctx.strokeRect(mousePos.x - 25, mousePos.y - 25, 50, 50);
-        }
 
-        // Software Cursor Glow
-        ctx.setLineDash([]);
-        const cursorColor = isHoveringEnemy ? '#ff3333' : (selectedUnitIds.length > 0 ? '#00ff00' : '#ffffff');
-        ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(255,255,255,0.5)';
-        ctx.strokeStyle = cursorColor; ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(mousePos.x - 12, mousePos.y); ctx.lineTo(mousePos.x - 4, mousePos.y);
-        ctx.moveTo(mousePos.x + 4, mousePos.y); ctx.lineTo(mousePos.x + 12, mousePos.y);
-        ctx.moveTo(mousePos.x, mousePos.y - 12); ctx.lineTo(mousePos.x, mousePos.y - 4);
-        ctx.moveTo(mousePos.x, mousePos.y + 4); ctx.lineTo(mousePos.x, mousePos.y + 12);
-        ctx.stroke();
-        ctx.shadowBlur = 0; ctx.fillStyle = cursorColor; ctx.fillRect(mousePos.x - 1, mousePos.y - 1, 2, 2);
+        if (placementMode) {
+            ctx.globalAlpha = 0.4;
+            ctx.fillStyle = isValid ? '#00ff00' : '#ff0000';
+            ctx.fillRect(mousePos.x - 25, mousePos.y - 25, 50, 50);
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = isValid ? '#00ff00' : '#ff0000'; ctx.lineWidth = 2;
+            ctx.strokeRect(mousePos.x - 25, mousePos.y - 25, 50, 50);
+        }
     }
 };

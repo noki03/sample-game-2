@@ -1,85 +1,49 @@
-/* client/src/index.css */
-
-/* 1. Global Reset */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  /* Hide the system mouse everywhere so our software cursor takes over */
-  /* cursor: none !important; */
+  /* Define the custom RTS cursor globally. The browser handles this with 0 lag. */
+  /* cursor: url("https://cur.cursors-4u.net/games/gam-4/gam373.cur"), auto !important; */
+  cursor: url("https://cursor-custom.com/cursors/crosshair2.png"), crosshair !important;
 }
 
-/* 2. Viewport Setup */
 html,
 body,
 #root {
   width: 100%;
   height: 100%;
-  overflow: hidden; /* Prevent accidental scrolling */
-  background-color: #000; /* Deep black background */
-  color: #fff;
+  overflow: hidden;
+  background-color: #000;
   font-family: "Consolas", "Monospace", sans-serif;
 }
 
-/* 3. The App Container */
 .game-container {
   width: 100vw;
   height: 100vh;
-  position: relative;
   display: flex;
   flex-direction: column;
 }
 
-/* 4. The Unified Software Cursor Canvas (TOP LAYER) */
 canvas {
-  position: fixed; /* Stays locked to the viewport */
-  top: 0;
-  left: 0;
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 100% !important;
+  /* Canvas height is explicitly what's left above the panel */
+  height: calc(100vh - 180px) !important;
   display: block;
-  /* Z-INDEX 9999 ensures the crosshair draws over the buttons.
-     POINTER-EVENTS NONE allows you to click "through" the canvas 
-     to hit the HTML buttons or the input layer underneath. */
-  /* z-index: 10005; */
-  pointer-events: none;
-  cursor: none !important;
+  background-color: #1e3f1e;
+  /* Game interactions happen directly on this element */
 }
 
-/* 5. The Command Panel (MIDDLE LAYER) */
-
-/* 6. The Game Input Layer (BOTTOM INTERACTION LAYER) */
-.input-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  /* Instead of calc(100vh - 180px), make it a bit shorter 
-     so it doesn't overlap the pop-up label */
-  height: calc(100vh - 210px);
-  z-index: 5;
-  background: transparent;
-}
-/* 7. Utility Styles for the Command Panel Buttons */
-.command-panel button {
-  transition: all 0.1s ease;
+.command-panel {
+  height: 180px;
+  width: 100%;
+  background-color: #151515;
+  border-top: 3px solid #00ff00;
+  position: relative;
+  z-index: 10;
+  overflow: visible; /* Allows the Context Tab to pop out */
 }
 
-.command-panel button:active {
-  transform: scale(0.95);
-  filter: brightness(1.2);
-}
-
-.victory-screen-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 10000; /* Just below the canvas */
-  pointer-events: auto; /* Block clicks to the world */
-}
-
+/* Notification Pulse for Insufficient Funds */
 .notification-pulse {
   animation: pulse-animation 1s infinite;
 }

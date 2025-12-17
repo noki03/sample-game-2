@@ -1,6 +1,5 @@
 // client/src/App.jsx
 
-import { useGameStore } from './store/useGameStore';
 import CommandPanel from './ui/CommandPanel';
 import GameCanvas from './ui/GameCanvas';
 import VictoryScreen from './ui/VictoryScreen';

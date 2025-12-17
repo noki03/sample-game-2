@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { sendCommand } from '../network/SocketManager';
 
 export const useGameControls = (canvasRef, gameState, selfPlayerId, placementMode, setPlacementMode, setSelectedUnits) => {
@@ -8,43 +8,55 @@ export const useGameControls = (canvasRef, gameState, selfPlayerId, placementMod
     const [dragEnd, setDragEnd] = useState({ x: 0, y: 0 });
     const [ripples, setRipples] = useState([]);
 
-    const getCanvasCoords = (e) => ({ x: e.clientX, y: e.clientY });
+    const getCanvasCoords = (e) => ({
+        x: e.nativeEvent.offsetX,
+        y: e.nativeEvent.offsetY
+    });
 
     const checkPlacementValid = useCallback((x, y) => {
         if (!gameState) return false;
-        const worldHeight = window.innerHeight - 180;
-        if (x < 0 || y < 0 || x + 50 > window.innerWidth || y + 50 > worldHeight) return false;
+        const buildSize = 50;
+        const width = canvasRef.current?.width || 0;
+        const height = canvasRef.current?.height || 0;
+
+        if (x < 0 || y < 0 || x + buildSize > width || y + buildSize > height) return false;
 
         const bOverlap = gameState.buildings.some(b =>
-            !(x + 50 < b.x || x > b.x + 50 || y + 50 < b.y || y > b.y + 50)
+            !(x + buildSize < b.x || x > b.x + 50 || y + buildSize < b.y || y > b.y + 50)
         );
         const uOverlap = gameState.units.some(u =>
-            u.x >= x && u.x <= x + 50 && u.y >= y && u.y <= y + 50
+            u.x >= x && u.x <= x + buildSize && u.y >= y && u.y <= y + buildSize
         );
         return !bOverlap && !uOverlap;
-    }, [gameState]);
+    }, [gameState, canvasRef]);
 
-    const handleMouseMove = useCallback((e) => {
+    const handleMouseMove = (e) => {
         const coords = getCanvasCoords(e);
         setMousePos(coords);
         if (isDragging) setDragEnd(coords);
-    }, [isDragging]);
+    };
 
     const handleMouseDown = (e) => {
         const coords = getCanvasCoords(e);
         const { x, y } = coords;
-        if (y > window.innerHeight - 180) return;
 
-        if (placementMode && e.button === 0) {
-            if (checkPlacementValid(x - 25, y - 25)) {
-                sendCommand('PLACE_BUILDING', { buildingType: placementMode, x: x - 25, y: y - 25 });
-                setPlacementMode(null);
+        // Left Click
+        if (e.button === 0) {
+            if (placementMode) {
+                if (checkPlacementValid(x - 25, y - 25)) {
+                    sendCommand('PLACE_BUILDING', { buildingType: placementMode, x: x - 25, y: y - 25 });
+                    setPlacementMode(null);
+                }
+            } else {
+                setDragStart(coords); setDragEnd(coords); setIsDragging(true);
             }
-            return;
         }
 
+        // Right Click (Rally Point / Move)
         if (e.button === 2) {
+            if (placementMode) { setPlacementMode(null); return; }
             const { selectedUnitIds, buildings, units } = gameState;
+
             const selectedBuilding = buildings.find(b => selectedUnitIds.includes(b.id) && b.ownerId === selfPlayerId);
             const prodTypes = ['barracks', 'war_factory', 'command_center'];
 
@@ -53,34 +65,33 @@ export const useGameControls = (canvasRef, gameState, selfPlayerId, placementMod
             } else if (selectedUnitIds.length > 0) {
                 const target = units.find(u => u.ownerId !== selfPlayerId && Math.hypot(u.x - x, u.y - y) < 20) ||
                     buildings.find(b => b.ownerId !== selfPlayerId && x >= b.x && x <= b.x + 50 && y >= b.y && y <= b.y + 50);
+
                 if (target) sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetUnitId: target.id });
                 else sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetX: x, targetY: y });
             }
             setRipples(prev => [...prev, { id: Date.now(), x, y, alpha: 1.0 }]);
-            return;
         }
-        if (e.button === 0) { setDragStart(coords); setDragEnd(coords); setIsDragging(true); }
     };
 
     const handleMouseUp = (e) => {
-        if (e.button !== 0 || !isDragging) { setIsDragging(false); return; }
-        setIsDragging(false);
-        const coords = getCanvasCoords(e);
-        const { units, buildings } = gameState;
-        const left = Math.min(dragStart.x, coords.x);
-        const right = Math.max(dragStart.x, coords.x);
-        const top = Math.min(dragStart.y, coords.y);
-        const bottom = Math.max(dragStart.y, coords.y);
+        if (e.button === 0 && isDragging) {
+            setIsDragging(false);
+            const { units, buildings } = gameState;
+            const left = Math.min(dragStart.x, dragEnd.x);
+            const right = Math.max(dragStart.x, dragEnd.x);
+            const top = Math.min(dragStart.y, dragEnd.y);
+            const bottom = Math.max(dragStart.y, dragEnd.y);
 
-        if (right - left > 5) {
-            const ids = units.filter(u => u.ownerId === selfPlayerId && u.x >= left && u.x <= right && u.y >= top && u.y <= bottom).map(u => u.id);
-            setSelectedUnits(ids);
-        } else {
-            const unit = units.find(u => Math.hypot(u.x - coords.x, u.y - coords.y) < 20 && u.ownerId === selfPlayerId);
-            if (unit) setSelectedUnits([unit.id]);
-            else {
-                const bldg = buildings.find(b => coords.x >= b.x && coords.x <= b.x + 50 && coords.y >= b.y && coords.y <= b.y + 50 && b.ownerId === selfPlayerId);
-                setSelectedUnits(bldg ? [bldg.id] : []);
+            if (right - left > 5) {
+                const ids = units.filter(u => u.ownerId === selfPlayerId && u.x >= left && u.x <= right && u.y >= top && u.y <= bottom).map(u => u.id);
+                setSelectedUnits(ids);
+            } else {
+                const unit = units.find(u => Math.hypot(u.x - dragEnd.x, u.y - dragEnd.y) < 20 && u.ownerId === selfPlayerId);
+                if (unit) setSelectedUnits([unit.id]);
+                else {
+                    const bldg = buildings.find(b => dragEnd.x >= b.x && dragEnd.x <= b.x + 50 && dragEnd.y >= b.y && dragEnd.y <= b.y + 50 && b.ownerId === selfPlayerId);
+                    setSelectedUnits(bldg ? [bldg.id] : []);
+                }
             }
         }
     };
