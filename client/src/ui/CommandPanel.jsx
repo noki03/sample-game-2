@@ -55,7 +55,12 @@ const CommandPanel = () => {
 
             {/* 2. Contextual Menus */}
             <div style={styles.buttonArea}>
-
+                {/* NEW: Selection Identity Header */}
+                {selectedEntities.length === 1 && (
+                    <div style={{ position: 'absolute', top: '-25px', left: '200px', background: '#00ff00', color: '#000', padding: '2px 10px', fontWeight: 'bold', fontSize: '12px', borderRadius: '3px 3px 0 0' }}>
+                        {selectedEntities[0].type.replace('_', ' ').toUpperCase()}
+                    </div>
+                )}
                 {/* BUILDER MENU */}
                 {hasBuilder && (
                     <div style={styles.menuGroup}>

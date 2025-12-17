@@ -66,17 +66,44 @@ const GameCanvas = () => {
     };
 
     const handleMouseUp = (e) => {
-        if (e.button !== 0 || !isDragging) { setIsDragging(false); return; }
+        if (e.button !== 0 || !isDragging) {
+            setIsDragging(false);
+            return;
+        }
         setIsDragging(false);
-        const left = Math.min(dragStart.x, dragEnd.x); const right = Math.max(dragStart.x, dragEnd.x);
-        const top = Math.min(dragStart.y, dragEnd.y); const bottom = Math.max(dragStart.y, dragEnd.y);
 
-        if (right - left > 5) {
-            const ids = units.filter(u => u.ownerId === selfPlayerId && u.x >= left && u.x <= right && u.y >= top && u.y <= bottom).map(u => u.id);
+        const rect = canvasRef.current.getBoundingClientRect();
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
+
+        const left = Math.min(dragStart.x, endX);
+        const right = Math.max(dragStart.x, endX);
+        const top = Math.min(dragStart.y, endY);
+        const bottom = Math.max(dragStart.y, endY);
+
+        // Box Selection (Usually only for units in RTS)
+        if (right - left > 5 || bottom - top > 5) {
+            const ids = units
+                .filter(u => u.ownerId === selfPlayerId && u.x >= left && u.x <= right && u.y >= top && u.y <= bottom)
+                .map(u => u.id);
             setSelectedUnits(ids);
         } else {
-            const unit = units.find(u => Math.hypot(u.x - dragEnd.x, u.y - dragEnd.y) < 20 && u.ownerId === selfPlayerId);
-            setSelectedUnits(unit ? [unit.id] : []);
+            // --- Single Click Selection (Units OR Buildings) ---
+
+            // 1. Check for Units first
+            const unit = units.find(u => Math.hypot(u.x - endX, u.y - endY) < 20 && u.ownerId === selfPlayerId);
+
+            if (unit) {
+                setSelectedUnits([unit.id]);
+            } else {
+                // 2. Check for Buildings if no unit was clicked
+                const building = buildings.find(b =>
+                    endX >= b.x && endX <= b.x + 50 &&
+                    endY >= b.y && endY <= b.y + 50 &&
+                    b.ownerId === selfPlayerId
+                );
+                setSelectedUnits(building ? [building.id] : []);
+            }
         }
     };
 
@@ -85,9 +112,54 @@ const GameCanvas = () => {
         ctx.fillStyle = '#1e3f1e'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
         buildings.forEach(b => {
-            ctx.fillStyle = b.ownerId === selfPlayerId ? (b.status === 'CONSTRUCTING' ? '#444' : '#888') : '#662222';
+            const isSelected = selectedUnitIds.includes(b.id);
+
+            // Base Shadow/Foundation
+            ctx.fillStyle = '#111';
+            ctx.fillRect(b.x + 2, b.y + 2, 50, 50);
+
+            // Primary Building Color
+            let mainColor = '#888'; // Default
+            if (b.ownerId !== selfPlayerId) mainColor = '#662222';
+            else if (b.status === 'CONSTRUCTING') mainColor = '#444';
+            else {
+                // Unique Colors per Type
+                if (b.type === 'command_center') mainColor = '#5555ff'; // Blue-ish
+                if (b.type === 'supply_center') mainColor = '#ffcc00';  // Yellow/Gold
+                if (b.type === 'power_generator') mainColor = '#00cccc'; // Cyan/Electric
+                if (b.type === 'barracks') mainColor = '#447744';      // Military Green
+                if (b.type === 'war_factory') mainColor = '#aa6622';   // Rusty Orange
+            }
+
+            ctx.fillStyle = mainColor;
             ctx.fillRect(b.x, b.y, 50, 50);
-            ctx.fillStyle = '#440000'; ctx.fillRect(b.x, b.y - 12, 50, 6);
+
+            // --- Add Unique Design "Greebles" ---
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            if (b.type === 'power_generator') {
+                // Draw "Coils"
+                for (let i = 0; i < 5; i++) ctx.strokeRect(b.x + 10, b.y + 5 + (i * 8), 30, 4);
+            } else if (b.type === 'supply_center') {
+                // Draw "Roof Hatch"
+                ctx.strokeRect(b.x + 15, b.y + 15, 20, 20);
+                ctx.beginPath(); ctx.moveTo(b.x + 15, b.y + 15); ctx.lineTo(b.x + 35, b.y + 35); ctx.stroke();
+            } else if (b.type === 'barracks') {
+                // Draw "Tents/Windows"
+                ctx.strokeRect(b.x + 5, b.y + 30, 10, 15);
+                ctx.strokeRect(b.x + 35, b.y + 30, 10, 15);
+            }
+
+            // Selection Highlight (Keep your existing strokeRect logic here)
+            if (isSelected) {
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(b.x - 4, b.y - 4, 58, 58);
+            }
+
+            // Health Bar
+            ctx.fillStyle = '#440000';
+            ctx.fillRect(b.x, b.y - 12, 50, 6);
             ctx.fillStyle = b.status === 'CONSTRUCTING' ? '#ffff00' : '#00ff00';
             ctx.fillRect(b.x, b.y - 12, (b.health / b.maxHealth) * 50, 6);
         });
