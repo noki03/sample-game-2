@@ -20,7 +20,8 @@ export const processCommands = (state, commands) => {
                     maxHealth: stats.maxHealth,
                     status: 'CONSTRUCTING',
                     progress: 0,
-                    queue: []
+                    queue: [],
+                    rallyPoint: { x: payload.x + 60, y: payload.y + 120 }, // Default spot in front
                 });
             }
         }
