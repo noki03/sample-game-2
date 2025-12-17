@@ -5,9 +5,9 @@ import { UNIT_STATS, BUILDING_STATS } from '../constants';
  */
 const isAreaOccupied = (state, x, y) => {
     const buildSize = 50;
-    const margin = 2; // Slight buffer to prevent tight pixel clipping
+    const margin = 2;
 
-    // Check against existing buildings
+    // 1. Check against ALL buildings (including those under construction)
     const buildingOverlap = state.buildings.some(b => {
         return !(x + buildSize - margin < b.x ||
             x + margin > b.x + 50 ||
@@ -15,7 +15,8 @@ const isAreaOccupied = (state, x, y) => {
             y + margin > b.y + 50);
     });
 
-    // Check against units
+    // 2. Check against ALL units
+    // This prevents placing a building directly on top of a tank or infantry
     const unitOverlap = state.units.some(u => {
         return (u.x >= x && u.x <= x + buildSize &&
             u.y >= y && u.y <= y + buildSize);
@@ -91,32 +92,36 @@ export const processCommands = (state, commands) => {
                 const unit = state.units.find(u => u.id === unitId);
                 if (unit && unit.ownerId === playerId) {
 
-                    // Check if the target is a building under construction
+                    // 1. Check if target is a construction frame for builders
                     const targetBuilding = state.buildings.find(b =>
                         payload.targetUnitId === b.id && b.status === 'CONSTRUCTING'
                     );
 
                     if (targetBuilding && unit.type === 'builder') {
-                        // Manual re-assignment to a building frame
                         unit.targetX = targetBuilding.x + 25;
                         unit.targetY = targetBuilding.y + 25;
                         unit.isMoving = true;
                         unit.status = 'MOVING_TO_BUILD';
                         unit.task = { type: 'CONSTRUCT', targetId: targetBuilding.id };
-                    } else if (!payload.targetUnitId) {
-                        // Move to ground: Clear construction task
+                    }
+                    // 2. Manual Move to Ground
+                    else if (!payload.targetUnitId) {
                         unit.targetX = payload.targetX;
                         unit.targetY = payload.targetY;
                         unit.isMoving = true;
                         unit.status = 'MOVING';
                         unit.task = null;
                         unit.targetEntityId = null;
-                    } else if (unit.stats.damage > 0) {
-                        // Attack Target
-                        unit.task = null;
-                        unit.targetEntityId = payload.targetUnitId;
-                        unit.status = 'ATTACKING';
-                        unit.isMoving = false;
+                    }
+                    // 3. Attack Command (The Fix: check unit.stats.damage)
+                    else {
+                        const hasDamage = unit.stats && unit.stats.damage > 0;
+                        if (hasDamage) {
+                            unit.task = null;
+                            unit.targetEntityId = payload.targetUnitId;
+                            unit.status = 'ATTACKING';
+                            unit.isMoving = true; // Set to true so combatSystem can handle the initial chase
+                        }
                     }
                 }
             });

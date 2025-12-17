@@ -5,31 +5,48 @@ export const updateUnitMovement = (state) => {
     state.units.forEach(unit => {
         if (!unit.isMoving) return;
 
+        // Decrement ignore timer if it exists
+        if (unit.ignoreCollisionTicks > 0) {
+            unit.ignoreCollisionTicks--;
+        }
+
         const dx = unit.targetX - unit.x;
         const dy = unit.targetY - unit.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // Builders stop slightly further away to start working
         const stopRange = unit.status === 'MOVING_TO_BUILD' ? 40 : 5;
-
         if (distance <= stopRange) {
-            unit.x = unit.targetX;
-            unit.y = unit.targetY;
             unit.isMoving = false;
-
-            // Task transition: Move -> Work
-            if (unit.status === 'MOVING_TO_BUILD') {
-                unit.status = 'CONSTRUCTING';
-            } else {
-                unit.status = 'IDLE';
-            }
+            unit.status = unit.status === 'MOVING_TO_BUILD' ? 'CONSTRUCTING' : 'IDLE';
             return;
         }
 
-        const stats = UNIT_STATS[unit.type];
-        const speed = stats?.speed || 5;
-        unit.x += (dx / distance) * speed;
-        unit.y += (dy / distance) * speed;
+        const stats = unit.stats || { speed: 5 };
+        const moveX = (dx / distance) * stats.speed;
+        const moveY = (dy / distance) * stats.speed;
+
+        const nextX = unit.x + moveX;
+        const nextY = unit.y + moveY;
+        const unitRadius = 10;
+
+        // FIX: Check collisions ONLY if the unit isn't in its "spawn protection" phase
+        const willHitBuilding = unit.ignoreCollisionTicks > 0 ? false : state.buildings.some(b => {
+            return (nextX + unitRadius > b.x &&
+                nextX - unitRadius < b.x + 50 &&
+                nextY + unitRadius > b.y &&
+                nextY - unitRadius < b.y + 50);
+        });
+
+        if (!willHitBuilding) {
+            unit.x = nextX;
+            unit.y = nextY;
+        } else {
+            // If they hit something, stop and wait for a new order
+            unit.isMoving = false;
+            unit.status = 'IDLE';
+            unit.targetX = null;
+            unit.targetY = null;
+        }
     });
 };
 
