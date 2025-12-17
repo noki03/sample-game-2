@@ -39,5 +39,22 @@ export const styles = {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', zIndex: 10,
         boxShadow: '0 0 5px rgba(0,0,0,0.5)', border: '1px solid #fff'
+    },
+    confirmOverlay: {
+        position: 'absolute',
+        top: 0, left: 0, width: '100%', height: '100%',
+        backgroundColor: 'rgba(20, 0, 0, 0.9)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        zIndex: 2000,
+        borderTop: '2px solid #ff4444'
+    },
+    confirmBtn: {
+        background: '#440000', color: '#fff', border: '1px solid #ff4444',
+        padding: '8px 25px', cursor: 'pointer', fontWeight: 'bold'
+    },
+    cancelBtn: {
+        background: '#222', color: '#aaa', border: '1px solid #555',
+        padding: '8px 25px', cursor: 'pointer', fontWeight: 'bold'
     }
 };

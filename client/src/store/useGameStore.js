@@ -6,6 +6,7 @@ export const useGameStore = create((set, get) => ({
     gameState: INITIAL_STATE,
     placementMode: null, // Stores the type of building being placed (e.g., 'barracks')
     notification: null,
+    pendingAction: null,
 
     updateGameState: (newGameState) => set({ gameState: newGameState }),
 
@@ -25,4 +26,6 @@ export const useGameStore = create((set, get) => ({
         // Automatically clear after 3 seconds
         setTimeout(() => set({ notification: null }), 3000);
     },
+    setPendingAction: (action) => set({ pendingAction: action }),
+    clearPendingAction: () => set({ pendingAction: null }),
 }));

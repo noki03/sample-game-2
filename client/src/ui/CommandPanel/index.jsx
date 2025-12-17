@@ -1,14 +1,13 @@
 import React from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { sendCommand } from '../../network/SocketManager';
-import { BUILDING_STATS } from '../../game/constants';
+import { BUILDING_STATS, UNIT_STATS } from '../../game/constants';
 import { styles } from './styles';
 import ProductionButton from './ProductionButton';
 
 const CommandPanel = () => {
     const gameState = useGameStore(state => state.gameState);
-    const notification = useGameStore(state => state.notification);
-    const setNotification = useGameStore(state => state.setNotification);
+    const { notification, setNotification, pendingAction, setPendingAction, clearPendingAction } = useGameStore();
     const selfId = useGameStore(state => state.getSelfPlayerId());
 
     const player = gameState?.players.find(p => p.id === selfId);
@@ -19,12 +18,23 @@ const CommandPanel = () => {
     const activeBuilding = buildings.find(b => selectedUnitIds.includes(b.id) && b.ownerId === selfId);
     const hasBuilder = selectedEntities.some(e => e.type === 'builder');
 
-    // --- Logic Handlers ---
+    // --- Unified Action Handler (Replaces alerts) ---
     const handleAction = (type, cost, callback) => {
         if (player.resources.money < cost) {
-            return setNotification ? setNotification("INSUFFICIENT FUNDS") : alert("Insufficient Funds!");
+            return setNotification("INSUFFICIENT FUNDS");
         }
         callback();
+    };
+
+    // --- Confirmation Handler (Replaces window.confirm) ---
+    const requestSell = (building) => {
+        setPendingAction({
+            message: `SELL FOR $${Math.floor(BUILDING_STATS[building.type].cost * 0.5)}?`,
+            onConfirm: () => {
+                sendCommand('SELL_BUILDING', { buildingId: building.id });
+                clearPendingAction();
+            }
+        });
     };
 
     const handleCancelUnit = (buildingId, unitType) => {
@@ -35,13 +45,26 @@ const CommandPanel = () => {
 
     return (
         <div style={styles.panel} className="command-panel">
+            {/* 1. Notification Overlay */}
             {notification && <div style={styles.notificationOverlay} className="notification-pulse">⚠️ {notification}</div>}
 
-            {selectedEntities.length === 1 && (
+            {/* 2. Confirmation Overlay (RTS Style) */}
+            {pendingAction && (
+                <div style={styles.confirmOverlay}>
+                    <span style={{ color: '#ff4444', fontWeight: 'bold' }}>{pendingAction.message}</span>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <button style={styles.confirmBtn} onClick={pendingAction.onConfirm}>YES</button>
+                        <button style={styles.cancelBtn} onClick={clearPendingAction}>NO</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Context Label */}
+            {selectedEntities.length === 1 && !pendingAction && (
                 <div style={styles.contextLabel}>{selectedEntities[0].type.replace('_', ' ').toUpperCase()}</div>
             )}
 
-            {/* Resources Section */}
+            {/* Resource Display */}
             <div style={styles.resourceSection}>
                 <h2 style={{ color: '#00ff00', margin: 0 }}>${Math.floor(player.resources.money)}</h2>
                 <div style={{ fontSize: '12px', marginTop: '5px' }}>
@@ -51,7 +74,7 @@ const CommandPanel = () => {
 
             {/* Action Area */}
             <div style={styles.buttonArea}>
-                {hasBuilder && (
+                {hasBuilder && !pendingAction && (
                     <div style={styles.menuGroup}>
                         <span style={styles.label}>STRUCTURES</span>
                         {Object.keys(BUILDING_STATS).map(type => (
@@ -62,31 +85,23 @@ const CommandPanel = () => {
                     </div>
                 )}
 
-                {activeBuilding?.type === 'barracks' && (
+                {activeBuilding?.type === 'barracks' && !pendingAction && (
                     <div style={styles.menuGroup}>
                         <span style={styles.label}>INFANTRY</span>
-                        <ProductionButton unitType="ranger" building={activeBuilding} onCancel={handleCancelUnit} onTrain={(type, id) => handleAction(type, 50, () => sendCommand('BUILD_UNIT', { unitType: type, buildingId: id }))} />
+                        <ProductionButton unitType="ranger" building={activeBuilding} onCancel={handleCancelUnit} onTrain={(type, id) => handleAction(type, UNIT_STATS[type].cost, () => sendCommand('BUILD_UNIT', { unitType: type, buildingId: id }))} />
                     </div>
                 )}
 
-                {activeBuilding?.type === 'war_factory' && (
-                    <div style={styles.menuGroup}>
-                        <span style={styles.label}>VEHICLES</span>
-                        <ProductionButton unitType="crusader" building={activeBuilding} onCancel={handleCancelUnit} onTrain={(type, id) => handleAction(type, 200, () => sendCommand('BUILD_UNIT', { unitType: type, buildingId: id }))} />
-                    </div>
-                )}
-
-                {activeBuilding && (
+                {/* Sell/Cancel Logic */}
+                {activeBuilding && !pendingAction && (
                     <div style={styles.managementGroup}>
                         <span style={styles.label}>OPTIONS</span>
                         <button style={{ ...styles.btn, color: activeBuilding.status === 'CONSTRUCTING' ? '#ffcc00' : '#ff4444' }}
-                            onClick={() => activeBuilding.status === 'CONSTRUCTING' ? sendCommand('CANCEL_BUILDING', { buildingId: activeBuilding.id }) : window.confirm("Sell for 50%?") && sendCommand('SELL_BUILDING', { buildingId: activeBuilding.id })}>
+                            onClick={() => activeBuilding.status === 'CONSTRUCTING' ? sendCommand('CANCEL_BUILDING', { buildingId: activeBuilding.id }) : requestSell(activeBuilding)}>
                             {activeBuilding.status === 'CONSTRUCTING' ? 'CANCEL (100%)' : 'SELL (50%)'}
                         </button>
                     </div>
                 )}
-
-                {selectedEntities.length === 0 && <div style={{ color: '#555', fontStyle: 'italic', alignSelf: 'center' }}>Select a unit or building to see options</div>}
             </div>
         </div>
     );
