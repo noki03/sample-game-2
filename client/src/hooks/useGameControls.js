@@ -33,7 +33,6 @@ export const useGameControls = (canvasRef, gameState, selfPlayerId, placementMod
     const handleMouseDown = (e) => {
         const coords = getCanvasCoords(e);
         const { x, y } = coords;
-
         if (y > window.innerHeight - 180) return;
 
         if (placementMode && e.button === 0) {
@@ -44,28 +43,22 @@ export const useGameControls = (canvasRef, gameState, selfPlayerId, placementMod
             return;
         }
 
-        if (e.button === 2) { // Right Click
-            if (placementMode) { setPlacementMode(null); return; }
+        if (e.button === 2) {
             const { selectedUnitIds, buildings, units } = gameState;
-
-            // --- SET RALLY POINT LOGIC ---
             const selectedBuilding = buildings.find(b => selectedUnitIds.includes(b.id) && b.ownerId === selfPlayerId);
             const prodTypes = ['barracks', 'war_factory', 'command_center'];
 
             if (selectedBuilding && selectedUnitIds.length === 1 && prodTypes.includes(selectedBuilding.type)) {
                 sendCommand('SET_RALLY_POINT', { buildingId: selectedBuilding.id, x, y });
             } else if (selectedUnitIds.length > 0) {
-                // Combat or Move orders
                 const target = units.find(u => u.ownerId !== selfPlayerId && Math.hypot(u.x - x, u.y - y) < 20) ||
                     buildings.find(b => b.ownerId !== selfPlayerId && x >= b.x && x <= b.x + 50 && y >= b.y && y <= b.y + 50);
-
                 if (target) sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetUnitId: target.id });
                 else sendCommand('MOVE_UNITS', { unitIds: selectedUnitIds, targetX: x, targetY: y });
             }
             setRipples(prev => [...prev, { id: Date.now(), x, y, alpha: 1.0 }]);
             return;
         }
-
         if (e.button === 0) { setDragStart(coords); setDragEnd(coords); setIsDragging(true); }
     };
 

@@ -6,7 +6,7 @@
   padding: 0;
   box-sizing: border-box;
   /* Hide the system mouse everywhere so our software cursor takes over */
-  cursor: none !important;
+  /* cursor: none !important; */
 }
 
 /* 2. Viewport Setup */
@@ -41,25 +41,12 @@ canvas {
   /* Z-INDEX 9999 ensures the crosshair draws over the buttons.
      POINTER-EVENTS NONE allows you to click "through" the canvas 
      to hit the HTML buttons or the input layer underneath. */
-  z-index: 9999;
+  /* z-index: 10005; */
   pointer-events: none;
+  cursor: none !important;
 }
 
 /* 5. The Command Panel (MIDDLE LAYER) */
-.command-panel {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 180px;
-  background-color: #151515;
-  border-top: 3px solid #00ff00; /* C&C Green accent */
-  /* Z-INDEX 10 sits behind the cursor canvas but above the game input */
-  z-index: 10;
-  pointer-events: auto; /* Re-enable clicking for buttons */
-  display: flex;
-  box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
-}
 
 /* 6. The Game Input Layer (BOTTOM INTERACTION LAYER) */
 .input-layer {
@@ -67,13 +54,12 @@ canvas {
   top: 0;
   left: 0;
   width: 100vw;
-  /* Captures game clicks only in the area NOT covered by the UI panel */
-  height: calc(100vh - 180px);
+  /* Instead of calc(100vh - 180px), make it a bit shorter 
+     so it doesn't overlap the pop-up label */
+  height: calc(100vh - 210px);
   z-index: 5;
   background: transparent;
-  pointer-events: auto;
 }
-
 /* 7. Utility Styles for the Command Panel Buttons */
 .command-panel button {
   transition: all 0.1s ease;
@@ -82,4 +68,30 @@ canvas {
 .command-panel button:active {
   transform: scale(0.95);
   filter: brightness(1.2);
+}
+
+.victory-screen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000; /* Just below the canvas */
+  pointer-events: auto; /* Block clicks to the world */
+}
+
+.notification-pulse {
+  animation: pulse-animation 1s infinite;
+}
+
+@keyframes pulse-animation {
+  0% {
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.05);
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
 }

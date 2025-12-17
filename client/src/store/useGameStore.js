@@ -5,6 +5,7 @@ import { INITIAL_STATE } from '../game/constants';
 export const useGameStore = create((set, get) => ({
     gameState: INITIAL_STATE,
     placementMode: null, // Stores the type of building being placed (e.g., 'barracks')
+    notification: null,
 
     updateGameState: (newGameState) => set({ gameState: newGameState }),
 
@@ -17,5 +18,11 @@ export const useGameStore = create((set, get) => ({
     getSelfPlayerId: () => {
         const state = get().gameState;
         return state.players[0]?.id || 'self';
-    }
+    },
+
+    setNotification: (message) => {
+        set({ notification: message });
+        // Automatically clear after 3 seconds
+        setTimeout(() => set({ notification: null }), 3000);
+    },
 }));

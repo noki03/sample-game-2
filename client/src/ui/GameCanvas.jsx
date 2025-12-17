@@ -13,24 +13,32 @@ const GameCanvas = () => {
 
     const controls = useGameControls(canvasRef, gameState, selfPlayerId, placementMode, setPlacementMode, setSelectedUnits);
 
+    const isGameOver = gameState?.status !== 'PLAYING';
+
     const checkHover = useCallback((pos) => {
+        if (!gameState) return false;
         const { units, buildings } = gameState;
         return units.find(u => u.ownerId !== selfPlayerId && Math.hypot(u.x - pos.x, u.y - pos.y) < 20) ||
             buildings.find(b => b.ownerId !== selfPlayerId && pos.x >= b.x && pos.x <= b.x + 50 && pos.y >= b.y && pos.y <= b.y + 50);
     }, [gameState, selfPlayerId]);
 
     const draw = useCallback((ctx) => {
+        if (!gameState) return;
         const w = window.innerWidth;
         const h = window.innerHeight;
         const { units, buildings, selectedUnitIds, effects } = gameState;
         const isValid = placementMode ? controls.checkPlacementValid(controls.mousePos.x - 25, controls.mousePos.y - 25) : true;
 
         ctx.clearRect(0, 0, w, h);
+
+        // We still draw the background and units behind the victory screen 
+        // because it looks cool through the 0.85 opacity black!
         GameRenderer.drawBackground(ctx, w, h);
         GameRenderer.drawBuildings(ctx, buildings, selectedUnitIds, selfPlayerId);
         GameRenderer.drawUnits(ctx, units, selectedUnitIds, selfPlayerId);
         GameRenderer.drawCombatEffects(ctx, effects);
 
+        // UI Layer draws the selection boxes and the CURSOR
         GameRenderer.drawUI(ctx, {
             ...controls,
             selectedUnitIds,
@@ -62,13 +70,18 @@ const GameCanvas = () => {
 
     return (
         <div className="game-view-wrapper" style={{ position: 'relative', width: '100vw', height: '100vh' }}>
+            {/* Canvas is absolute/fixed via CSS, drawing the cursor on top of everything */}
             <canvas ref={canvasRef} />
-            <div
-                className="input-layer"
-                onMouseDown={controls.handleMouseDown}
-                onMouseUp={controls.handleMouseUp}
-                onContextMenu={(e) => e.preventDefault()}
-            />
+
+            {/* Input layer only exists while playing */}
+            {!isGameOver && (
+                <div
+                    className="input-layer"
+                    onMouseDown={controls.handleMouseDown}
+                    onMouseUp={controls.handleMouseUp}
+                    onContextMenu={(e) => e.preventDefault()}
+                />
+            )}
         </div>
     );
 };

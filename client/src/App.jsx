@@ -10,6 +10,7 @@ function App() {
     <div className="game-container">
       <GameCanvas />
       <CommandPanel />
+      <VictoryScreen />
     </div>
   );
 }
