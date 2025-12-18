@@ -7,6 +7,7 @@ export const UNIT_STATS = {
     crusader: { speed: 5, damage: 30, range: 120, maxHealth: 250, cost: 800, buildTime: 150 },
 };
 
+// --- Building Definitions ---
 export const BUILDING_STATS = {
     command_center: { name: "Command Center", cost: 0, maxHealth: 2000, power: 50, buildTime: 60 },
     supply_center: { name: "Supply Center", cost: 1000, maxHealth: 1000, income: 50, power: -10, buildTime: 60 },
@@ -26,13 +27,14 @@ export const INITIAL_STATE = {
         {
             id: 100,
             ownerId: 'self',
-            x: 200,
-            y: 200,
+            x: 400,
+            y: 400,
             type: 'builder',
             health: 100,
             maxHealth: 100,
-            status: 'IDLE', // Added status
-            stats: { speed: 5, range: 10, damage: 0 }
+            status: 'IDLE',
+            // Synchronized stats to prevent deprecated data issues
+            stats: { ...UNIT_STATS.builder }
         }
     ],
     buildings: [
@@ -60,7 +62,16 @@ export const INITIAL_STATE = {
             queue: [],
             rallyPoint: { x: 225, y: 180 }
         },
-        { id: 999, ownerId: 'enemy', x: 1000, y: 500, type: 'command_center', health: 2000, maxHealth: 2000, status: 'READY' }
+        {
+            id: 999,
+            ownerId: 'enemy',
+            x: 1000,
+            y: 500,
+            type: 'command_center',
+            health: 2000,
+            maxHealth: 2000,
+            status: 'READY'
+        }
     ],
     selectedUnitIds: []
 };
