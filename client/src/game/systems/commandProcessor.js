@@ -82,32 +82,48 @@ export const processCommands = (state, commands) => {
             }
         }
 
-        // --- Unit Movement & Attack (Hybrid Pathfinding) ---
+        // --- Unit Movement & Attack (Hybrid Pathfinding with Path Safety) ---
         if (type === 'MOVE_UNITS') {
             payload.unitIds.forEach(unitId => {
                 const unit = state.units.find(u => u.id === unitId);
                 if (unit && unit.ownerId === playerId) {
-                    const dest = payload.targetUnitId ?
-                        (state.buildings.find(b => b.id === payload.targetUnitId) || state.units.find(u => u.id === payload.targetUnitId)) :
-                        { x: payload.targetX, y: payload.targetY };
 
-                    if (dest) {
-                        const path = Pathfinding.findPath({ x: unit.x, y: unit.y }, dest, state);
-                        unit.path = path;
-                        unit.pathIndex = 0;
-                        unit.targetX = path[0].x;
-                        unit.targetY = path[0].y;
-                        unit.isMoving = true;
+                    const destination = payload.targetUnitId
+                        ? (state.buildings.find(b => b.id === payload.targetUnitId) || state.units.find(u => u.id === payload.targetUnitId))
+                        : { x: payload.targetX, y: payload.targetY };
 
-                        // Handle task assignment (Building or Attack)
-                        if (dest.status === 'CONSTRUCTING' && unit.type === 'builder') {
-                            unit.status = 'MOVING_TO_BUILD';
-                            unit.task = { type: 'CONSTRUCT', targetId: dest.id };
-                        } else if (unit.stats?.damage > 0 && payload.targetUnitId) {
-                            unit.status = 'ATTACKING';
-                            unit.targetEntityId = payload.targetUnitId;
+                    if (destination) {
+                        const path = Pathfinding.findPath({ x: unit.x, y: unit.y }, destination, state);
+
+                        // SAFETY CHECK: Only proceed if a valid path was found
+                        if (path && path.length > 0) {
+                            unit.path = path;
+                            unit.pathIndex = 0;
+                            unit.targetX = path[0].x;
+                            unit.targetY = path[0].y;
+                            unit.isMoving = true;
+
+                            // Handle task assignment (Building or Attack)
+                            const isConstructionFrame = destination.status === 'CONSTRUCTING';
+                            if (isConstructionFrame && unit.type === 'builder') {
+                                unit.status = 'MOVING_TO_BUILD';
+                                unit.task = { type: 'CONSTRUCT', targetId: destination.id };
+                            } else if (unit.stats?.damage > 0 && payload.targetUnitId) {
+                                unit.status = 'ATTACKING';
+                                unit.targetEntityId = payload.targetUnitId;
+                                unit.task = null;
+                            } else {
+                                unit.status = 'MOVING';
+                                unit.task = null;
+                                unit.targetEntityId = null;
+                            }
                         } else {
-                            unit.status = 'MOVING';
+                            // Target is unreachable: Stop the unit and clear paths
+                            unit.isMoving = false;
+                            unit.path = null;
+                            unit.targetX = unit.x;
+                            unit.targetY = unit.y;
+                            unit.status = 'IDLE';
                             unit.task = null;
                         }
                     }
