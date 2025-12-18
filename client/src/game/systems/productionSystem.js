@@ -1,5 +1,6 @@
 // src/game/systems/productionSystem.js
 import { BUILDING_STATS, UNIT_STATS } from '../constants';
+import { Pathfinding } from '../logic/Pathfinding';
 
 export const updateConstruction = (state) => {
     state.buildings.forEach(b => {
@@ -63,11 +64,12 @@ export const updateProduction = (state) => {
 
             if (currentItem.progress >= currentItem.totalTime) {
                 const stats = UNIT_STATS[currentItem.type];
-
-                // FIX: Spawn units at the bottom center of the building, 
-                // just outside the 50x50 collision box.
                 const spawnX = b.x + 25;
-                const spawnY = b.y + 60; // 50 (building height) + 10 (buffer)
+                const spawnY = b.y + 60;
+
+                const dest = b.rallyPoint || { x: b.x + 25, y: b.y + 100 };
+                // Calculate the smart path to the rally point
+                const path = Pathfinding.findPath({ x: spawnX, y: spawnY }, dest, state);
 
                 const newUnit = {
                     id: Date.now() + Math.random(),
@@ -77,13 +79,14 @@ export const updateProduction = (state) => {
                     y: spawnY,
                     health: stats.maxHealth,
                     maxHealth: stats.maxHealth,
-                    targetX: b.rallyPoint ? b.rallyPoint.x : b.x + 25,
-                    targetY: b.rallyPoint ? b.rallyPoint.y : b.y + 100,
+                    // Waypoint data for smooth movement
+                    path: path,
+                    pathIndex: 0,
+                    targetX: path ? path[0].x : dest.x,
+                    targetY: path ? path[0].y : dest.y,
                     isMoving: true,
                     status: 'MOVING',
-                    stats: { ...stats },
-                    // NEW: Temporary ignore collision flag to prevent getting stuck
-                    ignoreCollisionTicks: 10
+                    stats: { ...stats }
                 };
 
                 state.units.push(newUnit);

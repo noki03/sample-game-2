@@ -3,53 +3,29 @@ import { UNIT_STATS } from '../constants';
 
 export const updateUnitMovement = (state) => {
     state.units.forEach(unit => {
-        if (!unit.isMoving) return;
+        if (!unit.isMoving || !unit.targetX) return;
 
         const dx = unit.targetX - unit.x;
         const dy = unit.targetY - unit.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // Standard stop range
-        const stopRange = unit.status === 'MOVING_TO_BUILD' ? 5 : 5;
-
-        if (distance <= stopRange) {
-            unit.x = unit.targetX;
-            unit.y = unit.targetY;
-            unit.isMoving = false;
-
-            if (unit.status === 'MOVING_TO_BUILD') {
-                unit.status = 'CONSTRUCTING';
+        // Steering logic: Snap to waypoints
+        if (distance <= 4) {
+            if (unit.path && unit.pathIndex < unit.path.length - 1) {
+                unit.pathIndex++;
+                unit.targetX = unit.path[unit.pathIndex].x;
+                unit.targetY = unit.path[unit.pathIndex].y;
             } else {
-                unit.status = 'IDLE';
+                unit.x = unit.targetX; unit.y = unit.targetY;
+                unit.isMoving = false; unit.path = null;
+                unit.status = unit.status === 'MOVING_TO_BUILD' ? 'CONSTRUCTING' : 'IDLE';
             }
             return;
         }
 
         const stats = unit.stats || UNIT_STATS[unit.type] || { speed: 5 };
-        const moveX = (dx / distance) * stats.speed;
-        const moveY = (dy / distance) * stats.speed;
-
-        const nextX = unit.x + moveX;
-        const nextY = unit.y + moveY;
-        const unitRadius = 10;
-
-        // NEW LOGIC: Only collide with buildings that are 'READY'
-        const willHitBuilding = state.buildings.some(b => {
-            if (b.status === 'CONSTRUCTING') return false; // Walk through ghosts
-
-            return (nextX + unitRadius > b.x &&
-                nextX - unitRadius < b.x + 50 &&
-                nextY + unitRadius > b.y &&
-                nextY - unitRadius < b.y + 50);
-        });
-
-        if (!willHitBuilding) {
-            unit.x = nextX;
-            unit.y = nextY;
-        } else {
-            unit.isMoving = false;
-            unit.status = 'IDLE';
-        }
+        unit.x += (dx / distance) * (stats.speed || 5);
+        unit.y += (dy / distance) * (stats.speed || 5);
     });
 };
 
