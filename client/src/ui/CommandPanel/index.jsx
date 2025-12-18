@@ -85,13 +85,44 @@ const CommandPanel = () => {
                     </div>
                 )}
 
+                {/* --- BARRACKS PRODUCTION --- */}
                 {activeBuilding?.type === 'barracks' && !pendingAction && (
                     <div style={styles.menuGroup}>
                         <span style={styles.label}>INFANTRY</span>
-                        <ProductionButton unitType="ranger" building={activeBuilding} onCancel={handleCancelUnit} onTrain={(type, id) => handleAction(type, UNIT_STATS[type].cost, () => sendCommand('BUILD_UNIT', { unitType: type, buildingId: id }))} />
+                        <ProductionButton
+                            unitType="ranger"
+                            building={activeBuilding}
+                            onCancel={handleCancelUnit}
+                            onTrain={(type, id) => handleAction(type, UNIT_STATS[type].cost, () => sendCommand('BUILD_UNIT', { unitType: type, buildingId: id }))}
+                        />
                     </div>
                 )}
 
+                {/* --- WAR FACTORY PRODUCTION --- */}
+                {activeBuilding?.type === 'war_factory' && !pendingAction && (
+                    <div style={styles.menuGroup}>
+                        <span style={styles.label}>VEHICLES</span>
+                        <ProductionButton
+                            unitType="crusader"
+                            building={activeBuilding}
+                            onCancel={handleCancelUnit}
+                            onTrain={(type, id) => handleAction(type, UNIT_STATS[type].cost, () => sendCommand('BUILD_UNIT', { unitType: type, buildingId: id }))}
+                        />
+                    </div>
+                )}
+
+                {/* --- NEW: COMMAND CENTER PRODUCTION --- */}
+                {activeBuilding?.type === 'command_center' && !pendingAction && (
+                    <div style={styles.menuGroup}>
+                        <span style={styles.label}>SUPPORT</span>
+                        <ProductionButton
+                            unitType="builder"
+                            building={activeBuilding}
+                            onCancel={handleCancelUnit}
+                            onTrain={(type, id) => handleAction(type, UNIT_STATS[type].cost, () => sendCommand('BUILD_UNIT', { unitType: type, buildingId: id }))}
+                        />
+                    </div>
+                )}
                 {/* Sell/Cancel Logic */}
                 {activeBuilding && !pendingAction && (
                     <div style={styles.managementGroup}>
